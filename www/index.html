@@ -45,11 +45,11 @@
       </div>
       <div class="score-board">
         <div class="score-card current">
-          <span class="label">SCORE</span>
+          <span class="label" id="score-label">SCORE</span>
           <span id="score-val" class="value">0</span>
         </div>
         <div class="score-card best">
-          <span class="label">BEST</span>
+          <span class="label" id="best-label">BEST</span>
           <span id="best-val" class="value">0</span>
         </div>
       </div>
@@ -67,6 +67,7 @@
           <p id="overlay-msg">Swipe or use arrows to slither. Collect coffee, avocados & pumpkin heads!</p>
           <div class="mantra-quote">"coffee = fuel ☕ · duality is architecture 🧡"</div>
           <button id="start-btn" class="sketch-btn primary-btn">START SLITHERING ✏️</button>
+          <button id="mode-btn" class="sketch-btn mode-btn">VS DUEL MODE ⚔️</button>
         </div>
       </div>
 
@@ -104,6 +105,7 @@
         <button class="dpad-btn down" data-dir="DOWN" aria-label="Down">▼</button>
       </div>
       <div class="speed-control">
+        <div class="vs-hint">P1 D-pad · P2 swipe</div>
         <button id="pause-btn" class="sketch-btn mini-btn">⏸ Pause</button>
         <button id="sound-btn" class="sketch-btn mini-btn">🔊 Sound</button>
       </div>
