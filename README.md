@@ -66,9 +66,25 @@ The game features an embedded, zero-dependency **Web Audio API synthesizer & seq
 |---|---|---|
 | **Mobile / Touch** | Swipe Gestures | Slither in any direction |
 | **Mobile / Touch** | On-screen D-Pad | Steer with tactile feedback |
+| **Mobile / Touch** | `✏️ INK` Button | Shoot lead / shed 1 tail segment for clutch escape |
 | **Desktop / Keyboard** | `Arrow Keys` / `WASD` | Steer snake |
-| **Desktop / Keyboard** | `Spacebar` | Pause / Resume |
-| **Android** | Hardware Haptics | Micro-vibrations on every bite (`navigator.vibrate`) |
+| **Desktop / Keyboard** | `Spacebar` | Shoot Ink / Shed Tail (when running) or Start game |
+| **Desktop / Keyboard** | `P` / `Escape` | Pause / Resume |
+| **Android** | Hardware Haptics | Micro-vibrations on bites, shots & combos (`navigator.vibrate`) |
+
+---
+
+## 🌟 Community Shout-Outs & Player Feedback
+
+Big love to the community for testing early builds and giving game-changing feedback! 🧡
+
+* **[@someguy_112358](https://x.com/someguy_112358)**:
+  > *"It's nice but maybe missing something besides the cool graphics to diferenciate it from other snakes. What if you added some powers, like shoting a part of itself or a immunity frame and some enemies or obstacles or something like that?"*
+  * **Resulting Mechanics:** Inspired the **Ink Shot / Shed Tail** clutch mechanic (sacrifice a tail segment to shoot pencil lead forward!), the **Rogue Eraser 🧼** hazard, and the **Ghost Sketch 🖍️** immunity power-up.
+
+* **[@Soorena](https://x.com/Soorena)**:
+  > *"the combo pop up blocks the items sometimes. maybe place the combo pop up outside of the game's frame?"*
+  * **Resulting Fix:** Moved the floating **Combo Badge** outside the game frame to the right side underneath the scoreboard so munchkins and the snake are never obscured.
 
 ---
 
@@ -118,5 +134,5 @@ This project is licensed under the [MIT License](LICENSE) — free for personal,
 
 <p align="center">
   <em>“progress not perfection · duality is architecture 🧡”</em><br>
-  <strong>Built with 🧡 by <a href="https://github.com/aunysillyme">Auny</a> (@AunySillyMe)</strong>
+  <strong>Built with 🧡 by <a href="https://github.com/aunysillyme">Auny</a> (<a href="https://x.com/AunySillyMe">@AunySillyMe</a>)</strong>
 </p>
