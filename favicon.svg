@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Sketchbook Paper Circle Background -->
+  <circle cx="32" cy="32" r="30" fill="#FCFAF6" stroke="#2A2B32" stroke-width="2.5" stroke-dasharray="1 0" />
+  
+  <!-- Crown on Snake Head -->
+  <path d="M22 22 L26 14 L32 19 L38 14 L42 22 Z" fill="#F59E0B" stroke="#B45309" stroke-width="1.8" stroke-linejoin="round" />
+  <circle cx="26" cy="14" r="1.5" fill="#EF4444" />
+  <circle cx="32" cy="19" r="1.5" fill="#3B82F6" />
+  <circle cx="38" cy="14" r="1.5" fill="#EF4444" />
+
+  <!-- Snake Head Body Curve -->
+  <path d="M18 42 C16 32 24 24 33 24 C43 24 49 31 47 40 C45 47 38 49 32 49 C26 49 20 46 18 42 Z" fill="#10B981" stroke="#065F46" stroke-width="2.5" stroke-linecap="round" />
+  
+  <!-- Big Cute Eye -->
+  <circle cx="37" cy="32" r="4.5" fill="#2A2B32" />
+  <circle cx="35.5" cy="30.5" r="1.6" fill="#FFFFFF" />
+  <circle cx="38.5" cy="33.5" r="0.8" fill="#FFFFFF" />
+
+  <!-- Rosy Cheeks & Smile -->
+  <ellipse cx="43" cy="37" rx="2.5" ry="1.5" fill="#F43F5E" opacity="0.6" />
+  <path d="M36 40 Q41 43 45 39" fill="none" stroke="#065F46" stroke-width="2" stroke-linecap="round" />
+
+  <!-- Tiny Forked Tongue -->
+  <path d="M45 40 L50 41 M50 41 L53 39 M50 41 L53 43" fill="none" stroke="#F43F5E" stroke-width="1.6" stroke-linecap="round" />
+
+  <!-- Mini Signature Heart Accent -->
+  <path d="M14 20 C12 17 8 18 8 21 C8 25 14 28 14 28 C14 28 20 25 20 21 C20 18 16 17 14 20 Z" fill="#F97316" transform="scale(0.55) translate(4, 4)" />
+</svg>
