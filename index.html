@@ -43,21 +43,23 @@
         <h1 class="title">sketchy snake <span class="scribble-tag">v1.0 ✏️</span></h1>
         <p class="subtitle">progress not perfection · eat the munchkins</p>
       </div>
-      <div class="score-board">
-        <div class="score-card current">
-          <span class="label">SCORE</span>
-          <span id="score-val" class="value">0</span>
+      <div class="score-area">
+        <div class="score-board">
+          <div class="score-card current">
+            <span class="label">SCORE</span>
+            <span id="score-val" class="value">0</span>
+          </div>
+          <div class="score-card best">
+            <span class="label">BEST</span>
+            <span id="best-val" class="value">0</span>
+          </div>
         </div>
-        <div class="score-card best">
-          <span class="label">BEST</span>
-          <span id="best-val" class="value">0</span>
-        </div>
+        <div id="combo-badge" class="combo-badge">COMBO x2! 🔥</div>
       </div>
     </header>
 
-    <!-- Top Status Banner (Outside Canvas so nothing is blocked) -->
+    <!-- Top Status Banner for Ghost Power-Up -->
     <div class="hud-status-banner">
-      <div id="combo-badge" class="combo-badge">COMBO x2! 🔥</div>
       <div id="power-badge" class="power-badge">✨ GHOST IMMUNITY 4s</div>
     </div>
 
@@ -98,7 +100,7 @@
     <!-- Mobile Touch Controls & Action Buttons -->
     <div class="touch-controls" id="touch-controls">
       <div class="action-btn-row">
-        <button id="ink-btn" class="sketch-btn ink-action-btn">✏️ INK SHOT [SPACE]</button>
+        <button id="ink-btn" class="sketch-btn ink-action-btn">✏️ INK SHOT</button>
       </div>
       <div class="dpad">
         <button class="dpad-btn up" data-dir="UP" aria-label="Up">▲</button>

@@ -677,10 +677,10 @@
     if (!btn) return;
     if (snake.length <= 3) {
       btn.classList.add('disabled');
-      btn.textContent = '✏️ INK (NEED 4+ SEGMENTS)';
+      btn.textContent = '✏️ INK (need 4+)';
     } else {
       btn.classList.remove('disabled');
-      btn.textContent = `✏️ INK SHOT [SPACE] (${snake.length - 1} left)`;
+      btn.textContent = `✏️ INK (${snake.length - 3})`;
     }
   }
 
