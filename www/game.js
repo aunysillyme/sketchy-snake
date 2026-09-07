@@ -17,7 +17,8 @@
     { name: 'pumpkin', label: '🎃 Pumpkin Head', color: '#F97316', points: 20, quote: 'autumn vibes!' },
     { name: 'potato', label: '🥔 Potato Head', color: '#D97706', points: 15, quote: 'potato power!' },
     { name: 'coffee', label: '☕ Coffee Fuel', color: '#854D0E', points: 30, quote: 'coffee = fuel ⚡', special: 'speed' },
-    { name: 'heart', label: '🧡 Orange Heart', color: '#EA580C', points: 50, quote: 'built with 🧡', special: 'heart' }
+    { name: 'heart', label: '🧡 Orange Heart', color: '#EA580C', points: 50, quote: 'built with 🧡', special: 'heart' },
+    { name: 'highlighter', label: '✨ Neon Highlighter', color: '#FACC15', points: 35, quote: 'ghost sketch! ✨', special: 'ghost' }
   ];
 
   const MANTRAS = [
@@ -44,6 +45,11 @@
   let isRunning = false;
   let isPaused = false;
   let particles = [];
+  let inkProjectiles = [];
+  let erasers = [];
+  let isGhostMode = false;
+  let ghostSecondsLeft = 0;
+  let ghostTimer = null;
   let soundEnabled = true;
   let audioCtx = null;
 
@@ -264,6 +270,41 @@
         gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
         osc.start(now);
         osc.stop(now + 0.35);
+      } else if (type === 'shoot') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(780, now);
+        osc.frequency.exponentialRampToValueAtTime(180, now + 0.09);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.09);
+        osc.start(now);
+        osc.stop(now + 0.09);
+      } else if (type === 'eraser_splat') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.exponentialRampToValueAtTime(90, now + 0.16);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.16);
+        osc.start(now);
+        osc.stop(now + 0.16);
+      } else if (type === 'eraser_hit') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(240, now);
+        osc.frequency.linearRampToValueAtTime(480, now + 0.07);
+        osc.frequency.linearRampToValueAtTime(140, now + 0.18);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+        osc.start(now);
+        osc.stop(now + 0.18);
+      } else if (type === 'ghost') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(523.25, now);
+        osc.frequency.setValueAtTime(659.25, now + 0.08);
+        osc.frequency.setValueAtTime(783.99, now + 0.16);
+        osc.frequency.setValueAtTime(1046.50, now + 0.24);
+        gain.gain.setValueAtTime(0.22, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+        osc.start(now);
+        osc.stop(now + 0.35);
       }
     } catch (e) {}
   }
@@ -423,12 +464,56 @@
       ctx.textBaseline = 'middle';
       ctx.fillText('🧡', px, py);
       ctx.restore();
+    } else if (food.type.name === 'highlighter') {
+      ctx.save();
+      ctx.font = `${cellSize * 0.95}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🖍️', px, py);
+      ctx.restore();
     } else {
       drawSketchCircle(px, py, r, food.type.color, '#2A2B32');
     }
   }
 
+  function renderErasers() {
+    for (const e of erasers) {
+      const px = e.x * cellSize + cellSize / 2;
+      const py = e.y * cellSize + cellSize / 2;
+      ctx.save();
+      ctx.font = `${cellSize * 0.95}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🧼', px, py);
+      ctx.restore();
+    }
+  }
+
+  function renderProjectiles() {
+    for (const p of inkProjectiles) {
+      const px = p.x * cellSize + cellSize / 2;
+      const py = p.y * cellSize + cellSize / 2;
+      ctx.save();
+      ctx.fillStyle = '#0F172A';
+      ctx.beginPath();
+      ctx.arc(px, py, cellSize * 0.26, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Lead streak trail
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.35)';
+      ctx.beginPath();
+      ctx.arc(px - p.dx * 6, py - p.dy * 6, cellSize * 0.16, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
   function renderSnake() {
+    if (isGhostMode) {
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+    }
+
     for (let i = 0; i < snake.length; i++) {
       const seg = snake[i];
       const x = seg.x * cellSize;
@@ -436,8 +521,10 @@
       const isHead = i === 0;
 
       if (isHead) {
-        // Head: Cobalt Blue with sketch contour
-        drawSketchRect(x + 1, y + 1, cellSize - 2, cellSize - 2, '#1D4ED8', '#1E3A8A');
+        // Head: Cobalt Blue or Golden Ghost Glow with sketch contour
+        const headFill = isGhostMode ? '#FACC15' : '#1D4ED8';
+        const headStroke = isGhostMode ? '#CA8A04' : '#1E3A8A';
+        drawSketchRect(x + 1, y + 1, cellSize - 2, cellSize - 2, headFill, headStroke);
         
         // Eyes based on direction
         const eyeOffset = cellSize * 0.3;
@@ -454,16 +541,19 @@
         ctx.fillRect(ex1 - 1, ey1 - 1, 2, 2);
         ctx.fillRect(ex2 - 1, ey2 - 1, 2, 2);
 
-        // Crown on combo streak
-        if (combo >= 2) {
+        // Crown on combo streak or ghost sparkle
+        if (isGhostMode) {
+          ctx.font = '12px sans-serif';
+          ctx.fillText('✨', x + 2, y - 4);
+        } else if (combo >= 2) {
           ctx.font = '12px sans-serif';
           ctx.fillText('👑', x + 2, y - 4);
         }
       } else {
-        // Body: Gradient sketch fill from Cobalt to Magenta
+        // Body: Gradient sketch fill from Cobalt to Magenta, or Golden if ghost
         const ratio = i / snake.length;
-        const color = ratio > 0.5 ? '#DB2777' : '#2563EB';
-        drawSketchRect(x + 2, y + 2, cellSize - 4, cellSize - 4, color, '#2A2B32');
+        const color = isGhostMode ? (ratio > 0.5 ? '#FEF08A' : '#FDE047') : (ratio > 0.5 ? '#DB2777' : '#2563EB');
+        drawSketchRect(x + 2, y + 2, cellSize - 4, cellSize - 4, color, isGhostMode ? '#A16207' : '#2A2B32');
         
         // Cross-hatch sketch detail
         if (i % 2 === 0) {
@@ -471,29 +561,127 @@
         }
       }
     }
+
+    if (isGhostMode) {
+      ctx.restore();
+    }
   }
 
   // --- Game Mechanics ---
   function spawnFood() {
     let valid = false;
     let newX, newY;
-    while (!valid) {
+    let attempts = 0;
+    while (!valid && attempts < 100) {
+      attempts++;
       newX = Math.floor(Math.random() * GRID_SIZE);
       newY = Math.floor(Math.random() * GRID_SIZE);
-      valid = !snake.some(seg => seg.x === newX && seg.y === newY);
+      const onSnake = snake.some(seg => seg.x === newX && seg.y === newY);
+      const onEraser = erasers.some(e => e.x === newX && e.y === newY);
+      valid = !onSnake && !onEraser;
     }
 
     // Pick munchkin type with weighted probability
     const rand = Math.random();
     let type = MUNCHKIN_TYPES[0];
-    if (rand < 0.35) type = MUNCHKIN_TYPES[0]; // Avocado
-    else if (rand < 0.60) type = MUNCHKIN_TYPES[1]; // Cucumber
-    else if (rand < 0.80) type = MUNCHKIN_TYPES[2]; // Pumpkin
-    else if (rand < 0.90) type = MUNCHKIN_TYPES[3]; // Potato
-    else if (rand < 0.96) type = MUNCHKIN_TYPES[4]; // Coffee
-    else type = MUNCHKIN_TYPES[5]; // Orange Heart
+    if (rand < 0.28) type = MUNCHKIN_TYPES[0]; // Avocado
+    else if (rand < 0.50) type = MUNCHKIN_TYPES[1]; // Cucumber
+    else if (rand < 0.68) type = MUNCHKIN_TYPES[2]; // Pumpkin
+    else if (rand < 0.80) type = MUNCHKIN_TYPES[3]; // Potato
+    else if (rand < 0.88) type = MUNCHKIN_TYPES[4]; // Coffee
+    else if (rand < 0.94) type = MUNCHKIN_TYPES[5]; // Orange Heart
+    else type = MUNCHKIN_TYPES[6]; // Neon Highlighter (Ghost Mode!)
 
     food = { x: newX, y: newY, type };
+  }
+
+  function spawnEraser() {
+    if (erasers.length >= 2) return;
+    let valid = false;
+    let ex, ey;
+    let tries = 0;
+    while (!valid && tries < 50) {
+      tries++;
+      ex = Math.floor(Math.random() * GRID_SIZE);
+      ey = Math.floor(Math.random() * GRID_SIZE);
+      const onSnake = snake.some(s => s.x === ex && s.y === ey);
+      const onFood = food && food.x === ex && food.y === ey;
+      const onEraser = erasers.some(e => e.x === ex && e.y === ey);
+      const nearHead = Math.abs(ex - snake[0].x) <= 2 && Math.abs(ey - snake[0].y) <= 2;
+      if (!onSnake && !onFood && !onEraser && !nearHead) {
+        valid = true;
+      }
+    }
+    if (valid) {
+      erasers.push({ x: ex, y: ey, ticksAlive: 0, maxTicks: 45 });
+      spawnFloatingDoodle(ex * cellSize, ey * cellSize, 'ROGUE ERASER! 🧼', '#EC4899');
+    }
+  }
+
+  function shootInk() {
+    if (!isRunning || isPaused || snake.length <= 1) return;
+    if (snake.length <= 3) {
+      spawnFloatingDoodle(snake[0].x * cellSize, snake[0].y * cellSize, 'NEED 4+ SEGMENTS! ✏️', '#DC2626');
+      triggerHaptic([40]);
+      return;
+    }
+
+    // Shed 1 segment from tail
+    snake.pop();
+
+    const head = snake[0];
+    let dx = 0, dy = 0;
+    if (direction === 'UP') dy = -1;
+    else if (direction === 'DOWN') dy = 1;
+    else if (direction === 'LEFT') dx = -1;
+    else if (direction === 'RIGHT') dx = 1;
+
+    inkProjectiles.push({
+      x: head.x + dx,
+      y: head.y + dy,
+      dx, dy,
+      life: 14
+    });
+
+    playSound('shoot');
+    triggerHaptic([20, 15, 20]);
+    spawnFloatingDoodle(head.x * cellSize, head.y * cellSize, 'LEAD SHED! ✏️💨', '#0F172A');
+    updateInkButtonState();
+  }
+
+  function activateGhostMode(seconds = 4) {
+    isGhostMode = true;
+    ghostSecondsLeft = seconds;
+    clearInterval(ghostTimer);
+
+    const badge = document.getElementById('power-badge');
+    if (badge) {
+      badge.textContent = `✨ GHOST ${ghostSecondsLeft}s`;
+      badge.classList.add('active');
+    }
+
+    ghostTimer = setInterval(() => {
+      ghostSecondsLeft--;
+      if (ghostSecondsLeft <= 0) {
+        isGhostMode = false;
+        clearInterval(ghostTimer);
+        if (badge) badge.classList.remove('active');
+      } else {
+        if (badge) badge.textContent = `✨ GHOST ${ghostSecondsLeft}s`;
+      }
+    }, 1000);
+  }
+
+  function updateInkButtonState() {
+    const btn = document.getElementById('ink-btn');
+    if (!btn) return;
+    if (snake.length <= 3) {
+      btn.classList.add('disabled');
+      btn.textContent = '✏️ INK (NEED 4+ SEGMENTS)';
+    } else {
+      btn.classList.remove('disabled');
+      btn.textContent = `✏️ INK SHOT [SPACE] (${snake.length - 1} left)`;
+    }
   }
 
   function update() {
@@ -507,21 +695,92 @@
     else if (direction === 'LEFT') head.x -= 1;
     else if (direction === 'RIGHT') head.x += 1;
 
-    // Wall Collision Check
+    // 1. Move Ink Projectiles & Check Hits
+    for (let i = inkProjectiles.length - 1; i >= 0; i--) {
+      const p = inkProjectiles[i];
+      p.x += p.dx;
+      p.y += p.dy;
+      p.life--;
+
+      if (p.x < 0 || p.x >= GRID_SIZE || p.y < 0 || p.y >= GRID_SIZE || p.life <= 0) {
+        inkProjectiles.splice(i, 1);
+        continue;
+      }
+
+      // Check hit eraser
+      let hit = false;
+      for (let j = erasers.length - 1; j >= 0; j--) {
+        const e = erasers[j];
+        if (e.x === p.x && e.y === p.y) {
+          erasers.splice(j, 1);
+          hit = true;
+          score += 40;
+          updateScoreUI();
+          playSound('eraser_splat');
+          triggerHaptic([30, 20, 40]);
+          spawnFloatingDoodle(e.x * cellSize, e.y * cellSize, '+40 INKED! 💥', '#059669');
+          break;
+        }
+      }
+      if (hit) {
+        inkProjectiles.splice(i, 1);
+      }
+    }
+
+    // 2. Update Eraser Lifetimes & Chance to Spawn
+    for (let i = erasers.length - 1; i >= 0; i--) {
+      erasers[i].ticksAlive++;
+      if (erasers[i].ticksAlive > erasers[i].maxTicks) {
+        erasers.splice(i, 1);
+      }
+    }
+    if (score >= 15 && erasers.length === 0 && Math.random() < 0.08) {
+      spawnEraser();
+    }
+
+    // 3. Wall Collision Check
     if (head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE) {
       gameOver('Ouch! Hit the margin border!');
       return;
     }
 
-    // Self Collision Check
-    if (snake.some(seg => seg.x === head.x && seg.y === head.y)) {
+    // 4. Self Collision Check (Bypassed if Ghost Mode!)
+    if (!isGhostMode && snake.some(seg => seg.x === head.x && seg.y === head.y)) {
       gameOver('Tangled up in your own sketch!');
       return;
     }
 
+    // 5. Eraser Collision Check with Snake Head
+    for (let i = erasers.length - 1; i >= 0; i--) {
+      const e = erasers[i];
+      if (head.x === e.x && head.y === e.y) {
+        if (isGhostMode) {
+          erasers.splice(i, 1);
+          score += 30;
+          updateScoreUI();
+          playSound('eraser_splat');
+          triggerHaptic([30, 30]);
+          spawnFloatingDoodle(head.x * cellSize, head.y * cellSize, '+30 GHOST SMASH! 👻', '#FACC15');
+        } else {
+          if (snake.length > 4) {
+            snake.pop();
+            snake.pop();
+            erasers.splice(i, 1);
+            playSound('eraser_hit');
+            triggerHaptic([80, 50, 80]);
+            spawnFloatingDoodle(head.x * cellSize, head.y * cellSize, 'ERASED 2 SEGMENTS! 🧼', '#EF4444');
+            updateInkButtonState();
+          } else {
+            gameOver('Erased by the rogue eraser 🧼!');
+            return;
+          }
+        }
+      }
+    }
+
     snake.unshift(head);
 
-    // Food Collision Check
+    // 6. Food Collision Check
     if (food && head.x === food.x && head.y === food.y) {
       const points = food.type.points * (combo > 0 ? combo + 1 : 1);
       score += points;
@@ -533,7 +792,15 @@
 
       spawnFloatingDoodle(head.x * cellSize, head.y * cellSize, `+${points} ${food.type.quote}`, food.type.color);
       triggerHaptic([30]);
-      playSound(food.type.name === 'coffee' ? 'coffee' : 'eat');
+
+      if (food.type.special === 'ghost') {
+        activateGhostMode(4);
+        playSound('ghost');
+      } else if (food.type.name === 'coffee') {
+        playSound('coffee');
+      } else {
+        playSound('eat');
+      }
 
       spawnFood();
       speedUp();
@@ -541,6 +808,7 @@
       snake.pop();
     }
 
+    updateInkButtonState();
     draw();
   }
 
@@ -548,6 +816,8 @@
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     renderGrid();
     renderFood();
+    renderErasers();
+    renderProjectiles();
     renderSnake();
     updateAndDrawParticles();
   }
@@ -601,7 +871,17 @@
     score = 0;
     combo = 0;
     particles = [];
+    inkProjectiles = [];
+    erasers = [];
+    isGhostMode = false;
+    ghostSecondsLeft = 0;
+    clearInterval(ghostTimer);
+
+    const powerBadge = document.getElementById('power-badge');
+    if (powerBadge) powerBadge.classList.remove('active');
+
     updateScoreUI();
+    updateInkButtonState();
 
     spawnFood();
     isRunning = true;
@@ -615,6 +895,11 @@
   function gameOver(reason) {
     isRunning = false;
     clearInterval(gameInterval);
+    clearInterval(ghostTimer);
+    isGhostMode = false;
+    const powerBadge = document.getElementById('power-badge');
+    if (powerBadge) powerBadge.classList.remove('active');
+
     triggerHaptic([60, 50, 80]);
     playSound('gameover');
 
@@ -655,10 +940,26 @@
       else if (['ArrowRight', 'KeyD'].includes(e.code)) { e.preventDefault(); handleDirection('RIGHT'); }
       else if (e.code === 'Space') {
         e.preventDefault();
-        if (!isRunning) startGame();
-        else togglePause();
+        if (!isRunning) {
+          startGame();
+          if (!isMusicPlaying) toggleMusic(true);
+        } else if (!isPaused) {
+          shootInk();
+        }
+      } else if (e.code === 'KeyP' || e.code === 'Escape') {
+        e.preventDefault();
+        togglePause();
       }
     });
+
+    // Ink Shot Button
+    const inkBtn = document.getElementById('ink-btn');
+    if (inkBtn) {
+      inkBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        shootInk();
+      });
+    }
 
     // Touch D-Pad buttons
     document.querySelectorAll('.dpad-btn').forEach(btn => {

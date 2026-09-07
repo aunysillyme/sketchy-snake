@@ -55,6 +55,12 @@
       </div>
     </header>
 
+    <!-- Top Status Banner (Outside Canvas so nothing is blocked) -->
+    <div class="hud-status-banner">
+      <div id="combo-badge" class="combo-badge">COMBO x2! 🔥</div>
+      <div id="power-badge" class="power-badge">✨ GHOST IMMUNITY 4s</div>
+    </div>
+
     <!-- Interactive Canvas Arena -->
     <div class="canvas-wrapper" id="canvas-wrap">
       <canvas id="game-canvas"></canvas>
@@ -64,14 +70,11 @@
         <div class="overlay-content">
           <div class="doodle-cat" id="overlay-icon">🐱💤</div>
           <h2 id="overlay-title">Ready to Sketch?</h2>
-          <p id="overlay-msg">Swipe or use arrows to slither. Collect coffee, avocados & pumpkin heads!</p>
-          <div class="mantra-quote">"coffee = fuel ☕ · duality is architecture 🧡"</div>
+          <p id="overlay-msg">Swipe or arrows to slither. <strong>[SPACE]</strong> or <strong>✏️ INK</strong> shoots lead! Beware rogue erasers 🧼 & grab highlighters for ghost immunity ✨</p>
+          <div class="mantra-quote">"progress not perfection · duality is architecture 🧡"</div>
           <button id="start-btn" class="sketch-btn primary-btn">START SLITHERING ✏️</button>
         </div>
       </div>
-
-      <!-- Combo Floating Banner -->
-      <div id="combo-badge" class="combo-badge">COMBO x2! 🔥</div>
     </div>
 
     <!-- Interactive Music Player & Doodles Widget -->
@@ -92,8 +95,11 @@
       <div class="heart-signature">built with 🧡</div>
     </div>
 
-    <!-- Mobile Touch Controls (D-Pad) -->
+    <!-- Mobile Touch Controls & Action Buttons -->
     <div class="touch-controls" id="touch-controls">
+      <div class="action-btn-row">
+        <button id="ink-btn" class="sketch-btn ink-action-btn">✏️ INK SHOT [SPACE]</button>
+      </div>
       <div class="dpad">
         <button class="dpad-btn up" data-dir="UP" aria-label="Up">▲</button>
         <div class="dpad-middle">
