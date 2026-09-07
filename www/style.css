@@ -521,7 +521,7 @@ canvas {
   }
 }
 
-/* --- VS Duel Mode --- */
+/* --- Duel Mode (shared chrome) --- */
 .mode-btn {
   margin-top: 8px;
   font-size: 0.95rem;
@@ -536,30 +536,44 @@ canvas {
   box-shadow: 1px 1px 0px var(--purple-ink);
 }
 
-body.mode-vs .mode-btn {
-  background: var(--purple-ink);
-  color: #FFF;
-  border-color: #0F172A;
-}
-
 /* In a duel the two score cards become the P1 / P2 round tallies. */
-body.mode-vs .score-card.current {
+body.mode-online .score-card.current {
   border-color: var(--cobalt-blue);
   box-shadow: 2px 2px 0px var(--cobalt-blue);
 }
 
-body.mode-vs .score-card.current .value {
+body.mode-online .score-card.current .value {
   color: var(--cobalt-blue);
 }
 
-body.mode-vs .score-card.best {
+body.mode-online .score-card.best {
   background: #FAF5FF;
   border-color: var(--purple-ink);
   box-shadow: 2px 2px 0px var(--purple-ink);
 }
 
-body.mode-vs .score-card.best .value {
+body.mode-online .score-card.best .value {
   color: var(--purple-ink);
+}
+
+/* Your own seat gets the dashed "this is you" ring. */
+body.you-p1 .score-card.current,
+body.you-p2 .score-card.best {
+  outline: 2px dashed var(--orange-heart);
+  outline-offset: 2px;
+}
+
+/* Online mode swaps the solo start card for the lobby. */
+body.mode-online .overlay-content > .doodle-cat,
+body.mode-online .overlay-content > .mantra-quote,
+body.mode-online #start-btn,
+body.mode-online #mode-btn {
+  display: none;
+}
+
+body.mode-online .overlay-content:not(.has-result) > h2,
+body.mode-online .overlay-content:not(.has-result) > p {
+  display: none;
 }
 
 .vs-hint {
@@ -570,6 +584,179 @@ body.mode-vs .score-card.best .value {
   letter-spacing: 0.3px;
 }
 
-body.mode-vs .vs-hint {
+body.mode-online .vs-hint {
   display: block;
+}
+
+/* The result card and the room card stack; the overlay is a row by default. */
+body.mode-online .overlay {
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+body.mode-online .overlay-content.has-result {
+  gap: 4px;
+}
+
+/* A round result and the room card share one square overlay, so both get
+   trimmed: the lobby heading and seat line are redundant once a result is up. */
+body.mode-online .overlay {
+  padding: 10px;
+}
+
+body.mode-online .overlay-content.has-result ~ .lobby .lobby-title,
+body.mode-online .overlay-content.has-result ~ .lobby .lobby-status,
+body.mode-online .overlay-content.has-result ~ .lobby .room-seat,
+body.mode-online .overlay-content.has-result ~ .lobby #lobby-back-btn {
+  display: none;
+}
+
+body.mode-online .overlay-content h2 {
+  font-size: 1.65rem;
+}
+
+body.mode-online .overlay-content p {
+  font-size: 0.9rem;
+  line-height: 1.2;
+}
+
+body.mode-online .overlay-content.has-result ~ .lobby .room-code {
+  font-size: 1.7rem;
+  letter-spacing: 4px;
+}
+
+body.mode-online .overlay-content.has-result ~ .lobby .room-code-wrap {
+  padding: 4px 12px;
+}
+
+/* --- Online Lobby --- */
+.lobby {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 300px;
+}
+
+.lobby[hidden] {
+  display: none;
+}
+
+.lobby-title {
+  font-family: 'Caveat', cursive;
+  font-size: 1.9rem;
+  color: var(--purple-ink);
+  line-height: 1;
+}
+
+.lobby-status {
+  font-size: 0.85rem;
+  color: #64748B;
+  min-height: 1.1em;
+}
+
+.lobby-status.is-online { color: #15803D; }
+.lobby-status.is-trouble { color: var(--magenta-pink); }
+
+.lobby-menu,
+.lobby-room {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.lobby-menu[hidden],
+.lobby-room[hidden] {
+  display: none;
+}
+
+.lobby-join {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.code-input {
+  font-family: 'Caveat', cursive;
+  font-size: 1.5rem;
+  font-weight: 700;
+  width: 104px;
+  padding: 4px 10px;
+  text-align: center;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  border: 2px dashed var(--pencil-charcoal);
+  border-radius: 8px;
+  background: #FFF;
+  color: var(--pencil-charcoal);
+}
+
+.code-input:focus {
+  outline: none;
+  border-color: var(--cobalt-blue);
+  border-style: solid;
+}
+
+.room-code-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: #FFF;
+  border: 2px solid var(--pencil-charcoal);
+  border-radius: 10px;
+  padding: 6px 14px;
+  box-shadow: 3px 3px 0px var(--pencil-charcoal);
+}
+
+.room-code-label {
+  font-size: 0.68rem;
+  letter-spacing: 1px;
+  color: #64748B;
+  text-transform: uppercase;
+}
+
+.room-code {
+  font-family: 'Caveat', cursive;
+  font-size: 2.2rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 6px;
+  color: var(--cobalt-blue);
+}
+
+.room-seat {
+  font-size: 0.95rem;
+  font-weight: bold;
+}
+
+.room-msg {
+  font-size: 0.9rem;
+  color: #4B5563;
+  text-align: center;
+  min-height: 1.1em;
+}
+
+/* --- Round Countdown --- */
+.countdown {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: 'Caveat', cursive;
+  font-size: 5rem;
+  font-weight: 700;
+  color: var(--cobalt-blue);
+  text-shadow: 3px 3px 0px #FFF, 6px 6px 0px rgba(42, 43, 50, 0.18);
+  pointer-events: none;
+  z-index: 12;
+}
+
+.countdown[hidden] {
+  display: none;
 }

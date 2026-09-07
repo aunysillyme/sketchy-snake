@@ -9,8 +9,12 @@ The git repo root is `sketchy-snake/`, one level below the usual working directo
 ## Commands
 
 ```bash
-# Run locally (no build step, no bundler, no framework)
+# Solo only (no build step, no bundler, no framework)
 python3 -m http.server 8080     # then open http://localhost:8080
+
+# Game + online duels: the duel server also serves the static files
+cd server && pnpm install && pnpm start   # http://localhost:8787
+cd server && pnpm test                    # rules engine + socket protocol
 
 # Native Android (Capacitor)
 npm install
@@ -19,15 +23,17 @@ npx cap open android
 cd android && ./gradlew assembleDebug
 ```
 
-There is no test suite, linter, or build pipeline (`npm test` is the default failing stub). Verify changes by loading the page and playing.
+The web client has no build step, linter, or tests — verify it by loading the page and playing. The server does have tests (`cd server && pnpm test`), and they are the right place to pin duel-rule behaviour.
 
 ## Architecture
 
-Three source files, zero dependencies at runtime:
+The web client is dependency-free; the duel server has one (`ws`).
 
 - `index.html` — static DOM shell. Every interactive element the game touches is looked up by hardcoded id (`game-canvas`, `game-overlay`, `overlay-title`/`-msg`/`-icon`, `score-val`, `best-val`, `combo-badge`, `start-btn`, `pause-btn`, `sound-btn`, `music-play-btn`, `next-track-btn`, `track-name`/`-time`/`-progress-bar`, `canvas-wrap`, D-pad buttons via `data-dir`). Renaming an id silently breaks the game — grep `game.js` before changing markup.
 - `style.css` — sketchbook aesthetic; palette lives in `:root` custom properties (`--paper-bg`, `--cobalt-blue`, `--magenta-pink`, `--purple-ink`, `--orange-heart`, …). `game.js` hardcodes the same hex values for canvas drawing, so a palette change must be made in both places.
 - `game.js` — the whole engine inside a single IIFE (`'use strict'`), no exports, entered from `DOMContentLoaded → init()`.
+- `net.js` — the duel socket client, also an IIFE, exposing `window.SketchyNet`.
+- `server/` — the authoritative duel server (Node + `ws`), with its own `package.json` and tests.
 
 ### Game loop
 
@@ -43,13 +49,24 @@ All canvas art goes through `roughOffset()` + `drawSketchLine` / `drawSketchRect
 
 Food types live in the `MUNCHKIN_TYPES` array (name, color, points, quote, optional `special`); `spawnFood()` picks one via a hardcoded cumulative-probability ladder whose thresholds are index-coupled to that array — reorder the array and the drop rates change with it.
 
-### VS duel mode
+### Online duel mode
 
-`mode` (`'solo' | 'vs'`) switches the whole machine. Player one reuses the solo variables (`snake`, `direction`, `score`); player two adds a parallel set (`snake2`, `direction2`, `score2`), and `matchWins` tracks rounds. `update()` dispatches to `updateVs()`, which differs from solo in three ways: neither snake ever `pop()`s (the trail is the weapon), collisions are resolved for both heads *before* either moves so simultaneous crashes read as a draw, and munchkins erase `VS_ERASE_ON_EAT` tail segments instead of adding one. Speed is pinned to `VS_SPEED_MS` — `speedUp()` is solo-only.
+`mode` is `'solo' | 'online'`. The client **never simulates a duel** — the server in `server/` owns the rules and the tick, and the client renders authoritative snapshots. When adding duel behaviour, change `server/duel.js`, not `game.js`.
 
-`handleDirection(dir, player)` takes a player tag: the D-pad passes `'p1'`, canvas swipes pass `'p2'`, and the keyboard splits WASD/arrows — but in solo mode every input is forced to `'p1'`, so solo controls behave exactly as before. `applyModeUI()` owns every DOM difference between the modes (score-card labels, overlay copy, `body.mode-vs`), so new mode-dependent UI belongs there rather than scattered at call sites.
+- `net.js` (loaded before `game.js`) wraps the socket and exposes `window.SketchyNet`: `connect/quickMatch/createRoom/joinRoom/sendDir/leave` plus an `on(event, fn)` subscription for every server message type. It owns reconnect backoff and the seat token in `sessionStorage`, and knows nothing about rendering.
+- `setupNet()` in `game.js` subscribes to those events. `applyServerState()` decodes flat cell ids into the same `snake`/`snake2`/`food` shapes the renderer already used, so all the sketch drawing works unchanged.
+- `handleDirection()` forwards intents in online mode and returns — no local movement, no prediction. Solo still simulates locally through `update()`.
+- `applyModeUI()` plus `setLobbyView`/`setOverlayResult` own every DOM difference between modes. The overlay hosts both the round-result card and the lobby; `has-result` on `.overlay-content` is what CSS keys off to trim the redundant lobby chrome.
+- A `?room=CODE` query parameter auto-joins that room on load (`joinFromUrl()`), which is what the copy-link button hands out.
+- `window.SKETCHY_DUEL_SERVER` in `index.html` selects the server; empty means "same origin as this page".
 
-Because VS trails are permanent, the board can genuinely fill: `spawnFood()` caps its rejection sampling and leaves `food` null rather than spinning forever. Keep that guard in any rewrite.
+### Duel server
+
+`server/duel.js` is the pure rules engine — no sockets, no timers, so a round can be stepped by hand in a test. `server/rooms.js` owns the phase machine (`waiting → countdown → playing → roundover`, plus `paused` while a dropped player's 20s grace runs) and quick-match. `server/index.js` is transport only.
+
+Rules worth preserving: both heads are resolved *before* either body moves (so simultaneous crashes are a real draw, not an ordering artifact); nothing ever `pop()`s except the eraser; intents are validated against the last **committed** direction, so two inputs inside one tick cannot compose a 180; and `spawnFood()` caps its rejection sampling because permanent trails can genuinely fill the board.
+
+Phase timings are env-overridable (`DUEL_COUNTDOWN_SECONDS`, `DUEL_ROUNDOVER_MS`, `DUEL_GRACE_MS`) — that is how the socket tests run fast. `node --test "server/test/*.test.js"` covers both layers; note the glob is required, `node --test test/` does not work here.
 
 ### Audio
 
@@ -57,8 +74,8 @@ Zero-dependency Web Audio synth. `TRACKS` describes each song declaratively (bpm
 
 ## www/ is a hand-maintained duplicate
 
-`capacitor.config.json` sets `"webDir": "www"`, and `www/` contains byte-identical copies of `game.js`, `index.html`, `style.css`, `manifest.json`, and the icons. **There is no copy script.** Any edit to a root web asset must be mirrored into `www/` before `npx cap sync android`, or the Android build ships the old game.
+`capacitor.config.json` sets `"webDir": "www"`, and `www/` contains byte-identical copies of `game.js`, `net.js`, `index.html`, `style.css`, `manifest.json`, and the icons. **There is no copy script.** Any edit to a root web asset must be mirrored into `www/` before `npx cap sync android`, or the Android build ships the old game.
 
 ## Deployment
 
-GitHub Pages serves the repo root (`.nojekyll` present), so root files are the live web build. Absolute OG/Twitter meta URLs in `index.html` point at `aunysillyme.github.io/sketchy-snake/` — update them if the site moves.
+GitHub Pages serves the repo root (`.nojekyll` present), so root files are the live web build. Pages is static, so online duels need the server deployed elsewhere (see `server/README.md`) and `window.SKETCHY_DUEL_SERVER` pointed at its `wss://` URL; the Android build must set it too, since a Capacitor bundle has no origin to fall back on. Absolute OG/Twitter meta URLs in `index.html` point at `aunysillyme.github.io/sketchy-snake/` — update them if the site moves.

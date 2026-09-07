@@ -10,10 +10,6 @@
   const GRID_SIZE = 18; // 18x18 grid
   const BASE_SPEED_MS = 135;
   const MIN_SPEED_MS = 65;
-  const VS_SPEED_MS = 110;      // Fixed tempo in VS: no speed-up, so neither player is favoured
-  const VS_ERASE_ON_EAT = 5;    // Munchkins act as erasers in VS, rubbing out tail segments
-  const VS_MIN_SPAWN_GAP = 9;   // Manhattan distance between the two random spawn points
-
   // Palettes for each duelist. p1 reproduces the original solo snake colours exactly.
   const PLAYERS = {
     p1: { name: 'P1', head: '#1D4ED8', headStroke: '#1E3A8A', bodyNear: '#2563EB', bodyFar: '#DB2777' },
@@ -52,14 +48,19 @@
   let gameInterval = null;
   let isRunning = false;
   let isPaused = false;
-  let mode = 'solo'; // 'solo' | 'vs'
+  let mode = 'solo'; // 'solo' | 'online'
 
-  // --- VS Duel State (player two; player one reuses the solo variables above) ---
+  // --- Online Duel State ---
+  // Everything here mirrors what the server sent. The client never simulates a
+  // duel: it renders authoritative snapshots and forwards direction intents.
   let snake2 = [];
   let direction2 = 'LEFT';
-  let nextDirection2 = 'LEFT';
   let score2 = 0;
-  let matchWins = { p1: 0, p2: 0 };
+  let mySeat = null;             // 'p1' | 'p2' | 'spectator' | null
+  let roomCode = null;
+  let netPhase = 'idle';         // idle | waiting | countdown | playing | roundover | paused
+  let matchWins = { p1: 0, p2: 0, draws: 0 };
+  let peers = { p1: null, p2: null, spectators: 0 };
   let particles = [];
   let soundEnabled = true;
   let audioCtx = null;
@@ -447,7 +448,7 @@
 
   function renderSnake() {
     drawSnakeBody(snake, direction, PLAYERS.p1, combo);
-    if (mode === 'vs') drawSnakeBody(snake2, direction2, PLAYERS.p2, 0);
+    if (mode === 'online') drawSnakeBody(snake2, direction2, PLAYERS.p2, 0);
   }
 
   function drawSnakeBody(body, dir, palette, comboVal) {
@@ -496,24 +497,14 @@
   }
 
   // --- Game Mechanics ---
-  function cellOccupied(x, y) {
-    if (snake.some(seg => seg.x === x && seg.y === y)) return true;
-    if (mode === 'vs' && snake2.some(seg => seg.x === x && seg.y === y)) return true;
-    return false;
-  }
-
   function spawnFood() {
     let valid = false;
     let newX, newY;
-    // VS trails are permanent, so the board can genuinely fill up — give up rather than spin.
-    let attempts = 0;
-    while (!valid && attempts < 400) {
+    while (!valid) {
       newX = Math.floor(Math.random() * GRID_SIZE);
       newY = Math.floor(Math.random() * GRID_SIZE);
-      valid = !cellOccupied(newX, newY);
-      attempts++;
+      valid = !snake.some(seg => seg.x === newX && seg.y === newY);
     }
-    if (!valid) { food = null; return; }
 
     // Pick munchkin type with weighted probability
     const rand = Math.random();
@@ -530,7 +521,6 @@
 
   function update() {
     if (!isRunning || isPaused) return;
-    if (mode === 'vs') { updateVs(); return; }
 
     direction = nextDirection;
     const head = { ...snake[0] };
@@ -577,161 +567,80 @@
     draw();
   }
 
-  // --- VS Duel Mechanics ---
-  function stepHead(head, dir) {
-    const next = { x: head.x, y: head.y };
-    if (dir === 'UP') next.y -= 1;
-    else if (dir === 'DOWN') next.y += 1;
-    else if (dir === 'LEFT') next.x -= 1;
-    else if (dir === 'RIGHT') next.x += 1;
-    return next;
+  // --- Online Duel: rendering what the server tells us ---
+  function cellsToBody(cells) {
+    return cells.map(id => ({ x: id % GRID_SIZE, y: Math.floor(id / GRID_SIZE) }));
   }
 
-  function hitsWall(cell) {
-    return cell.x < 0 || cell.x >= GRID_SIZE || cell.y < 0 || cell.y >= GRID_SIZE;
-  }
+  /** Adopt an authoritative snapshot. No prediction: the wire is the truth. */
+  function applyServerState(msg) {
+    snake = cellsToBody(msg.p1.cells);
+    snake2 = cellsToBody(msg.p2.cells);
+    direction = msg.p1.dir;
+    direction2 = msg.p2.dir;
+    nextDirection = msg.p1.dir;
+    score = msg.p1.score;
+    score2 = msg.p2.score;
 
-  // Returns null if the move is safe, otherwise how this player died.
-  function crashCause(head, rivalBody) {
-    if (hitsWall(head)) return 'margin';
-    if (rivalBody.some(seg => seg.x === head.x && seg.y === head.y)) return 'rival';
-    if (cellOccupied(head.x, head.y)) return 'own';
-    return null;
-  }
+    food = msg.food ? {
+      x: msg.food.at % GRID_SIZE,
+      y: Math.floor(msg.food.at / GRID_SIZE),
+      type: { name: msg.food.type, color: msg.food.color }
+    } : null;
 
-  function updateVs() {
-    direction = nextDirection;
-    direction2 = nextDirection2;
-
-    const head1 = stepHead(snake[0], direction);
-    const head2 = stepHead(snake2[0], direction2);
-
-    // Trails never shrink on their own here, so every drawn segment is lethal to both players.
-    let cause1 = crashCause(head1, snake2);
-    let cause2 = crashCause(head2, snake);
-
-    // Both heads onto the same empty cell, or heads swapping cells, is a mutual wipeout.
-    const sameCell = head1.x === head2.x && head1.y === head2.y;
-    const swapped = head1.x === snake2[0].x && head1.y === snake2[0].y &&
-                    head2.x === snake[0].x && head2.y === snake[0].y;
-    if (sameCell || swapped) {
-      cause1 = cause1 || 'headOn';
-      cause2 = cause2 || 'headOn';
-    }
-
-    if (cause1 || cause2) {
-      roundOver(cause1, cause2);
-      return;
-    }
-
-    snake.unshift(head1);
-    snake2.unshift(head2);
-    // No pop: the trail is the weapon.
-
-    eatInVs(head1, snake, 'p1');
-    eatInVs(head2, snake2, 'p2');
-
+    if (msg.eaten) msg.eaten.forEach(showEaten);
     draw();
   }
 
-  function eatInVs(head, body, who) {
-    if (!food || head.x !== food.x || head.y !== food.y) return;
-
-    const points = food.type.points;
-    if (who === 'p1') score += points; else score2 += points;
-
-    spawnFloatingDoodle(head.x * cellSize, head.y * cellSize, `${who.toUpperCase()} +${points} eraser!`, food.type.color);
-    // The munchkin is an eraser: it rubs out tail segments, the only way to free up space.
-    for (let i = 0; i < VS_ERASE_ON_EAT && body.length > 3; i++) body.pop();
-
-    triggerHaptic([30]);
-    playSound(food.type.name === 'coffee' ? 'coffee' : 'eat');
-    spawnFood();
+  function showEaten(e) {
+    const x = (e.at % GRID_SIZE) * cellSize;
+    const y = Math.floor(e.at / GRID_SIZE) * cellSize;
+    spawnFloatingDoodle(x, y, `${e.seat.toUpperCase()} +${e.points} ${e.quote}`, e.color);
+    if (e.seat === mySeat) triggerHaptic([30]);
+    playSound(e.type === 'coffee' ? 'coffee' : 'eat');
   }
 
-  function dirTowardCenter(cell) {
-    const c = (GRID_SIZE - 1) / 2;
-    const dx = c - cell.x;
-    const dy = c - cell.y;
-    if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? 'RIGHT' : 'LEFT';
-    return dy > 0 ? 'DOWN' : 'UP';
-  }
-
-  function spawnBodyAt(cell, dir) {
-    // Lay the 3 starting segments out behind the head so nobody starts mid-turn.
-    const back = {
-      UP: { x: 0, y: 1 }, DOWN: { x: 0, y: -1 },
-      LEFT: { x: 1, y: 0 }, RIGHT: { x: -1, y: 0 }
-    }[dir];
-    const body = [];
-    for (let i = 0; i < 3; i++) body.push({ x: cell.x + back.x * i, y: cell.y + back.y * i });
-    return body;
-  }
-
-  function randomInnerCell() {
-    // Keep spawns 3 cells clear of the margins so the starting body always fits on the paper.
-    const span = GRID_SIZE - 6;
-    return {
-      x: 3 + Math.floor(Math.random() * span),
-      y: 3 + Math.floor(Math.random() * span)
-    };
-  }
-
-  function spawnVsPlayers() {
-    let a = randomInnerCell();
-    let b = randomInnerCell();
-    let guard = 0;
-    while (Math.abs(a.x - b.x) + Math.abs(a.y - b.y) < VS_MIN_SPAWN_GAP && guard < 300) {
-      b = randomInnerCell();
-      guard++;
-    }
-
-    direction = dirTowardCenter(a);
-    direction2 = dirTowardCenter(b);
-    nextDirection = direction;
-    nextDirection2 = direction2;
-    snake = spawnBodyAt(a, direction);
-    snake2 = spawnBodyAt(b, direction2);
+  function seatLabel(seat) {
+    if (seat === 'p1') return 'P1 ✏️';
+    if (seat === 'p2') return 'P2 ⚔️';
+    return 'Spectator 👀';
   }
 
   function causeText(loser, cause) {
     if (cause === 'margin') return `${loser} ran off the edge of the page.`;
     if (cause === 'own') return `${loser} got tangled in their own trail.`;
     if (cause === 'headOn') return `${loser} met their rival head-on.`;
+    if (cause === 'forfeit') return `${loser} left the duel.`;
     return `${loser} slithered straight into the rival's trail.`;
   }
 
-  function roundOver(cause1, cause2) {
-    isRunning = false;
-    clearInterval(gameInterval);
+  function showRoundResult(msg) {
     triggerHaptic([60, 50, 80]);
     playSound('gameover');
+    if (msg.final) applyServerState(msg.final);
 
-    let title, icon, msg;
-    if (cause1 && cause2) {
+    matchWins = msg.wins || matchWins;
+    updateScoreUI();
+
+    let title, icon, detail;
+    if (!msg.winner) {
       title = 'Double Smudge!';
       icon = '💥🤝';
-      msg = 'Both snakes crashed on the same stroke — nobody scores this round.';
-    } else if (cause2) {
-      matchWins.p1++;
-      title = 'P1 Wins The Round! ✏️';
-      icon = '🏆✏️';
-      msg = causeText('P2', cause2);
+      detail = 'Both snakes crashed on the same stroke — nobody scores.';
     } else {
-      matchWins.p2++;
-      title = 'P2 Wins The Round! ⚔️';
-      icon = '🏆⚔️';
-      msg = causeText('P1', cause1);
+      const loser = msg.winner === 'p1' ? 'p2' : 'p1';
+      const cause = msg.causes ? msg.causes[loser] : null;
+      const wonIt = msg.winner === mySeat;
+      title = wonIt ? 'You Win The Round! 🏆' : `${seatLabel(msg.winner)} Wins The Round!`;
+      icon = wonIt ? '🏆🧡' : '🏆✏️';
+      detail = causeText(seatLabel(loser), cause);
     }
-    msg += ` Munchkins — P1: ${score} · P2: ${score2}. Match: ${matchWins.p1}–${matchWins.p2}.`;
 
-    updateScoreUI();
-    const overlay = document.getElementById('game-overlay');
-    document.getElementById('overlay-title').textContent = title;
-    document.getElementById('overlay-msg').textContent = msg;
-    document.getElementById('overlay-icon').textContent = icon;
-    document.getElementById('start-btn').textContent = 'NEXT ROUND ⚔️';
-    overlay.classList.remove('hidden');
+    const scores = msg.scores || { p1: score, p2: score2 };
+    setOverlayResult(title, icon,
+      `${detail} Munchkins — P1: ${scores.p1} · P2: ${scores.p2}.`);
+    setRoomMessage(`Match ${matchWins.p1}–${matchWins.p2}${matchWins.draws ? ` · ${matchWins.draws} drawn` : ''} · next round shortly…`);
+    showOverlay(true);
   }
 
   function draw() {
@@ -770,7 +679,7 @@
   }
 
   function updateScoreUI() {
-    if (mode === 'vs') {
+    if (mode === 'online') {
       document.getElementById('score-val').textContent = matchWins.p1;
       document.getElementById('best-val').textContent = matchWins.p2;
       return;
@@ -800,51 +709,108 @@
     snake2 = [];
     score = 0;
     score2 = 0;
-    matchWins = { p1: 0, p2: 0 };
+
+    if (mode === 'online') {
+      SketchyNet.connect();
+    } else {
+      SketchyNet.leave();
+      resetNetState();
+    }
+
     applyModeUI();
     draw();
   }
 
-  function applyModeUI() {
-    const isVs = mode === 'vs';
-    document.body.classList.toggle('mode-vs', isVs);
-    document.getElementById('score-label').textContent = isVs ? 'P1 ✏️' : 'SCORE';
-    document.getElementById('best-label').textContent = isVs ? 'P2 ⚔️' : 'BEST';
+  function resetNetState() {
+    mySeat = null;
+    roomCode = null;
+    netPhase = 'idle';
+    matchWins = { p1: 0, p2: 0, draws: 0 };
+    peers = { p1: null, p2: null, spectators: 0 };
+    document.body.classList.remove('you-p1', 'you-p2');
+    setLobbyView('menu');
+    hideCountdown();
+  }
 
-    const overlay = document.getElementById('game-overlay');
-    document.getElementById('overlay-title').textContent = isVs ? 'Sketch Duel! ⚔️' : 'Ready to Sketch?';
-    document.getElementById('overlay-msg').textContent = isVs
-      ? 'Two snakes, random spawns, permanent pencil trails. Box your rival in until they crash. P1: WASD or the D-pad. P2: arrow keys or swipe the paper.'
-      : 'Swipe or use arrows to slither. Collect coffee, avocados & pumpkin heads!';
-    document.getElementById('overlay-icon').textContent = isVs ? '✏️⚔️🐍' : '🐱💤';
-    document.getElementById('start-btn').textContent = isVs ? 'START DUEL ⚔️' : 'START SLITHERING ✏️';
-    document.getElementById('mode-btn').textContent = isVs ? '← SOLO MODE ✏️' : 'VS DUEL MODE ⚔️';
-    overlay.classList.remove('hidden');
+  function applyModeUI() {
+    const online = mode === 'online';
+    document.body.classList.toggle('mode-online', online);
+    document.getElementById('score-label').textContent = online ? 'P1 ✏️' : 'SCORE';
+    document.getElementById('best-label').textContent = online ? 'P2 ⚔️' : 'BEST';
+    document.getElementById('lobby').hidden = !online;
+    document.getElementById('mode-btn').textContent = online ? '← SOLO MODE ✏️' : 'ONLINE DUEL ⚔️';
+
+    if (!online) {
+      setOverlayResult('Ready to Sketch?', '🐱💤',
+        'Swipe or use arrows to slither. Collect coffee, avocados & pumpkin heads!');
+      document.querySelector('.overlay-content').classList.remove('has-result');
+      document.getElementById('start-btn').textContent = 'START SLITHERING ✏️';
+      document.getElementById('pause-btn').textContent = '⏸ Pause';
+    }
+
+    showOverlay(true);
     updateScoreUI();
+  }
+
+  // --- Lobby & overlay plumbing ---
+  function showOverlay(visible) {
+    document.getElementById('game-overlay').classList.toggle('hidden', !visible);
+  }
+
+  function setOverlayResult(title, icon, msg) {
+    document.getElementById('overlay-title').textContent = title;
+    document.getElementById('overlay-icon').textContent = icon;
+    document.getElementById('overlay-msg').textContent = msg;
+    if (mode === 'online') document.querySelector('.overlay-content').classList.add('has-result');
+  }
+
+  function setLobbyView(view) {
+    document.getElementById('lobby-menu').hidden = view !== 'menu';
+    document.getElementById('lobby-room').hidden = view !== 'room';
+    if (view === 'menu') document.querySelector('.overlay-content').classList.remove('has-result');
+  }
+
+  function setLobbyStatus(text, tone) {
+    const el = document.getElementById('lobby-status');
+    el.textContent = text;
+    el.classList.toggle('is-online', tone === 'good');
+    el.classList.toggle('is-trouble', tone === 'bad');
+  }
+
+  function setRoomMessage(text) {
+    document.getElementById('room-msg').textContent = text;
+  }
+
+  function updateRoomUI() {
+    document.getElementById('room-code').textContent = roomCode || '----';
+    const seatEl = document.getElementById('room-seat');
+    if (mySeat === 'spectator') {
+      seatEl.textContent = 'You are spectating 👀';
+    } else if (mySeat) {
+      seatEl.textContent = `You are ${seatLabel(mySeat)}`;
+    } else {
+      seatEl.textContent = '';
+    }
+    document.body.classList.toggle('you-p1', mySeat === 'p1');
+    document.body.classList.toggle('you-p2', mySeat === 'p2');
+  }
+
+  function showCountdown(n) {
+    const el = document.getElementById('countdown');
+    el.hidden = false;
+    el.textContent = n > 0 ? String(n) : 'GO!';
+  }
+
+  function hideCountdown() {
+    document.getElementById('countdown').hidden = true;
+  }
+
+  function roomLink() {
+    return `${location.origin}${location.pathname}?room=${roomCode}`;
   }
 
   function startRound() {
-    if (mode === 'vs') startVsGame();
-    else startGame();
-  }
-
-  function startVsGame() {
-    initAudio();
-    spawnVsPlayers();
-    score = 0;
-    score2 = 0;
-    combo = 0;
-    particles = [];
-    hideComboBadge();
-    updateScoreUI();
-
-    spawnFood();
-    isRunning = true;
-    isPaused = false;
-
-    document.getElementById('game-overlay').classList.add('hidden');
-    clearInterval(gameInterval);
-    gameInterval = setInterval(update, VS_SPEED_MS);
+    if (mode === 'solo') startGame();
   }
 
   function startGame() {
@@ -899,26 +865,32 @@
            (newDir === 'RIGHT' && curDir === 'LEFT');
   }
 
-  function handleDirection(newDir, player) {
+  function handleDirection(newDir) {
     initAudio();
-    // Outside a duel every input drives player one, so solo controls are unchanged.
-    const who = (mode === 'vs' && player === 'p2') ? 'p2' : 'p1';
-    const curDir = who === 'p2' ? direction2 : direction;
-    if (isReverse(newDir, curDir)) return;
-    if (who === 'p2') nextDirection2 = newDir;
-    else nextDirection = newDir;
+
+    if (mode === 'online') {
+      // The server validates and applies this; we do not move anything ourselves.
+      if (mySeat === 'p1' || mySeat === 'p2') SketchyNet.sendDir(newDir);
+      return;
+    }
+
+    if (isReverse(newDir, direction)) return;
+    nextDirection = newDir;
   }
 
   function setupControls() {
     // Keyboard
     window.addEventListener('keydown', (e) => {
-      // In a duel the arrows belong to P2 and WASD to P1; in solo both steer the one snake.
-      if (e.code === 'ArrowUp' || e.code === 'KeyW') { e.preventDefault(); handleDirection('UP', e.code === 'KeyW' ? 'p1' : 'p2'); }
-      else if (e.code === 'ArrowDown' || e.code === 'KeyS') { e.preventDefault(); handleDirection('DOWN', e.code === 'KeyS' ? 'p1' : 'p2'); }
-      else if (e.code === 'ArrowLeft' || e.code === 'KeyA') { e.preventDefault(); handleDirection('LEFT', e.code === 'KeyA' ? 'p1' : 'p2'); }
-      else if (e.code === 'ArrowRight' || e.code === 'KeyD') { e.preventDefault(); handleDirection('RIGHT', e.code === 'KeyD' ? 'p1' : 'p2'); }
+      // One player per device now, so arrows and WASD both steer your own snake.
+      if (document.activeElement === document.getElementById('join-code')) return;
+
+      if (e.code === 'ArrowUp' || e.code === 'KeyW') { e.preventDefault(); handleDirection('UP'); }
+      else if (e.code === 'ArrowDown' || e.code === 'KeyS') { e.preventDefault(); handleDirection('DOWN'); }
+      else if (e.code === 'ArrowLeft' || e.code === 'KeyA') { e.preventDefault(); handleDirection('LEFT'); }
+      else if (e.code === 'ArrowRight' || e.code === 'KeyD') { e.preventDefault(); handleDirection('RIGHT'); }
       else if (e.code === 'Space') {
         e.preventDefault();
+        if (mode === 'online') return;   // The server paces online rounds
         if (!isRunning) startRound();
         else togglePause();
       }
@@ -929,7 +901,7 @@
       btn.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         const dir = btn.getAttribute('data-dir');
-        handleDirection(dir, 'p1'); // The D-pad is player one's stick in a duel
+        handleDirection(dir);
         triggerHaptic([15]);
       });
     });
@@ -953,11 +925,10 @@
       const absDy = Math.abs(dy);
 
       if (Math.max(absDx, absDy) > 25) {
-        // Swiping the paper steers player two in a duel, player one in solo.
         if (absDx > absDy) {
-          handleDirection(dx > 0 ? 'RIGHT' : 'LEFT', 'p2');
+          handleDirection(dx > 0 ? 'RIGHT' : 'LEFT');
         } else {
-          handleDirection(dy > 0 ? 'DOWN' : 'UP', 'p2');
+          handleDirection(dy > 0 ? 'DOWN' : 'UP');
         }
       }
     }, { passive: true });
@@ -982,10 +953,59 @@
       if (!isMusicPlaying) toggleMusic(true);
     });
 
-    document.getElementById('mode-btn').addEventListener('click', () => {
-      setMode(mode === 'vs' ? 'solo' : 'vs');
+    document.getElementById('mode-btn').addEventListener('click', () => setMode('online'));
+    document.getElementById('lobby-back-btn').addEventListener('click', () => setMode('solo'));
+
+    document.getElementById('quick-btn').addEventListener('click', () => {
+      initAudio();
+      setRoomMessage('Looking for an opponent…');
+      SketchyNet.quickMatch();
     });
-    document.getElementById('pause-btn').addEventListener('click', togglePause);
+
+    document.getElementById('create-btn').addEventListener('click', () => {
+      initAudio();
+      SketchyNet.createRoom();
+    });
+
+    const codeInput = document.getElementById('join-code');
+    const submitCode = () => {
+      const code = codeInput.value.trim().toUpperCase();
+      if (code.length !== 4) {
+        setLobbyStatus('Room codes are 4 characters.', 'bad');
+        return;
+      }
+      initAudio();
+      SketchyNet.joinRoom(code);
+    };
+    document.getElementById('join-btn').addEventListener('click', submitCode);
+    codeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); submitCode(); }
+    });
+
+    document.getElementById('leave-btn').addEventListener('click', () => {
+      SketchyNet.leave();
+      resetNetState();
+      setLobbyStatus('Left the room.', null);
+      showOverlay(true);
+      draw();
+    });
+
+    document.getElementById('copy-link-btn').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      try {
+        await navigator.clipboard.writeText(roomLink());
+        btn.textContent = 'copied! ✓';
+      } catch (err) {
+        // Clipboard blocked (insecure origin, or denied): show the link to copy by hand.
+        setRoomMessage(roomLink());
+        btn.textContent = 'link shown ↑';
+      }
+      setTimeout(() => { btn.textContent = 'copy link 🔗'; }, 1800);
+    });
+    document.getElementById('pause-btn').addEventListener('click', () => {
+      if (mode === 'online') return;   // Rounds are server-paced; use "leave room"
+      togglePause();
+    });
     
     const soundBtn = document.getElementById('sound-btn');
     soundBtn.addEventListener('click', () => {
@@ -993,6 +1013,93 @@
       soundBtn.textContent = soundEnabled ? '🔊 Sound' : '🔇 Muted';
       if (!soundEnabled && isMusicPlaying) toggleMusic(false);
     });
+  }
+
+  // --- Server Events ---
+  function setupNet() {
+    const net = window.SketchyNet;
+
+    net.on('status', ({ status, detail }) => {
+      if (mode !== 'online') return;
+      if (status === 'online') setLobbyStatus('connected ✓', 'good');
+      else if (status === 'connecting') setLobbyStatus('connecting…', null);
+      else if (status === 'reconnecting') setLobbyStatus(`connection lost — ${detail || 'retrying'}`, 'bad');
+      else if (status === 'failed') setLobbyStatus(detail || 'could not reach the duel server', 'bad');
+      else setLobbyStatus('not connected', null);
+    });
+
+    net.on('joined', (msg) => {
+      mySeat = msg.seat;
+      roomCode = msg.room;
+      netPhase = msg.phase;
+      matchWins = msg.wins || matchWins;
+      peers = msg.players || peers;
+      updateRoomUI();
+      updateScoreUI();
+      setLobbyView('room');
+      setRoomMessage(msg.seat === 'spectator'
+        ? 'This duel is full — watching from the margins.'
+        : (bothSeated() ? 'Opponent found!' : 'Waiting for an opponent… share the code.'));
+      showOverlay(true);
+    });
+
+    net.on('peer', (msg) => {
+      peers = msg.players || peers;
+      matchWins = msg.wins || matchWins;
+      updateScoreUI();
+      if (netPhase === 'playing' || netPhase === 'countdown') return;
+      setRoomMessage(bothSeated() ? 'Opponent found!' : 'Waiting for an opponent… share the code.');
+    });
+
+    net.on('countdown', (msg) => {
+      netPhase = 'countdown';
+      showOverlay(false);
+      hideComboBadge();
+      showCountdown(msg.n);
+      if (msg.n === 0) setTimeout(hideCountdown, 450);
+    });
+
+    net.on('state', (msg) => {
+      if (netPhase !== 'roundover') netPhase = 'playing';
+      applyServerState(msg);
+    });
+
+    net.on('roundover', (msg) => {
+      netPhase = 'roundover';
+      hideCountdown();
+      showRoundResult(msg);
+    });
+
+    net.on('paused', (msg) => {
+      netPhase = 'paused';
+      hideCountdown();
+      setOverlayResult('Opponent Dropped 📵', '⏳',
+        `${seatLabel(msg.seat)} lost their connection. Holding the duel for ${msg.seconds}s…`);
+      showOverlay(true);
+    });
+
+    net.on('error', (msg) => {
+      setLobbyStatus(msg.message || 'Something went wrong.', 'bad');
+      if (msg.code === 'no_room') setLobbyView('menu');
+    });
+
+    net.on('left', () => {
+      resetNetState();
+      showOverlay(true);
+    });
+  }
+
+  function bothSeated() {
+    return Boolean(peers.p1 && peers.p2);
+  }
+
+  /** A ?room=CODE link drops you straight into that duel. */
+  function joinFromUrl() {
+    const code = new URLSearchParams(location.search).get('room');
+    if (!code) return false;
+    setMode('online');
+    SketchyNet.joinRoom(code);
+    return true;
   }
 
   // --- Resize & Init ---
@@ -1014,7 +1121,9 @@
 
     window.addEventListener('resize', resizeCanvas);
     setupControls();
+    setupNet();
     applyModeUI();
+    joinFromUrl();
     updateMusicUI();
     resizeCanvas();
     draw();

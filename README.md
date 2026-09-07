@@ -35,22 +35,42 @@ Instead of a standard clean grid, **Sketchy Snake** is built to feel like an ill
 
 ---
 
-## ⚔️ VS Duel Mode (Tron-style)
+## ⚔️ Online Duel Mode (Tron-style)
 
-Tap **VS DUEL MODE ⚔️** on the start card for local two-player duels on one screen:
+Tap **ONLINE DUEL ⚔️** on the start card to duel someone on another device.
 
 * **Random spawns:** both snakes drop onto random, well-separated cells facing open paper.
 * **Permanent pencil trails:** nobody's tail shrinks — every stroke you draw stays on the page as a wall.
 * **Win condition:** survive. Force your rival into your trail, their own trail, or the margin. Same-cell and head-on crashes are a **Double Smudge** (no point).
 * **Munchkins are erasers:** eating one scores points *and* rubs out 5 of your own tail segments — the only way to open up space again.
-* **Match tally:** the two score cards become the P1 ✏️ / P2 ⚔️ round tallies; **NEXT ROUND ⚔️** re-racks with fresh spawns.
+* **Rounds re-rack automatically** with fresh spawns, and the two score cards become the P1 ✏️ / P2 ⚔️ match tally.
 
-| Player | Keyboard | Touch |
-|---|---|---|
-| **P1** ✏️ (cobalt) | `W` `A` `S` `D` | On-screen D-pad |
-| **P2** ⚔️ (purple) | `Arrow Keys` | Swipe the paper |
+### Getting into a match
 
-Duels run at a fixed tempo with no speed-up, so neither player gets an advantage from scoring.
+| Route | How |
+|---|---|
+| **Room code** | *Create room* gives you a 4-character code and a shareable link (`?room=ABCD`). Anyone opening that link drops straight into your duel. |
+| **Quick match** | Pairs you with whoever else is waiting. |
+| **Spectate** | A third person opening a full room watches the duel instead of queueing. |
+| **Reconnect** | Refresh or drop the connection and you reclaim your seat for 20 seconds; the round pauses while you are away. |
+
+Steer with arrows, WASD, the D-pad, or a swipe — one player per device, so every control drives your own snake.
+
+### The server
+
+Duels are refereed by an authoritative Node WebSocket server in [`server/`](server/): it
+owns the tick, and clients only ever send direction intents. That keeps both boards
+identical, makes disconnects and draws unambiguous, and means a modified client cannot cheat.
+
+```bash
+cd server && pnpm install && pnpm start   # localhost:8787 serves the game *and* the socket
+cd server && pnpm test                    # rules engine + socket protocol
+```
+
+For a deployed site, set `window.SKETCHY_DUEL_SERVER` in `index.html` to your server's
+`wss://` URL. Left empty, the client talks to the origin that served the page.
+
+**Solo play needs no server** and still works offline, including in the Android build.
 
 ---
 
@@ -85,7 +105,7 @@ The game features an embedded, zero-dependency **Web Audio API synthesizer & seq
 |---|---|---|
 | **Mobile / Touch** | Swipe Gestures | Slither in any direction |
 | **Mobile / Touch** | On-screen D-Pad | Steer with tactile feedback |
-| **Desktop / Keyboard** | `Arrow Keys` / `WASD` | Steer snake (solo: both work) |
+| **Desktop / Keyboard** | `Arrow Keys` / `WASD` | Steer snake |
 | **Desktop / Keyboard** | `Spacebar` | Pause / Resume |
 | **Android** | Hardware Haptics | Micro-vibrations on every bite (`navigator.vibrate`) |
 
@@ -100,11 +120,13 @@ No heavy build tools required. To run the game locally:
 git clone https://github.com/aunysillyme/sketchy-snake.git
 cd sketchy-snake
 
-# Start a local HTTP server
+# Solo play only — any static server will do
 python3 -m http.server 8080
-
-# Open in browser
 open http://localhost:8080
+
+# Or run the duel server, which serves the game AND powers online mode
+cd server && pnpm install && pnpm start
+open http://localhost:8787
 ```
 
 ---

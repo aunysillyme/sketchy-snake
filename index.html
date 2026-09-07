@@ -67,9 +67,41 @@
           <p id="overlay-msg">Swipe or use arrows to slither. Collect coffee, avocados & pumpkin heads!</p>
           <div class="mantra-quote">"coffee = fuel ☕ · duality is architecture 🧡"</div>
           <button id="start-btn" class="sketch-btn primary-btn">START SLITHERING ✏️</button>
-          <button id="mode-btn" class="sketch-btn mode-btn">VS DUEL MODE ⚔️</button>
+          <button id="mode-btn" class="sketch-btn mode-btn">ONLINE DUEL ⚔️</button>
+        </div>
+
+        <!-- Online duel lobby: matchmaking, room code, and connection state -->
+        <div id="lobby" class="lobby" hidden>
+          <h2 class="lobby-title">Online Duel ⚔️</h2>
+          <p id="lobby-status" class="lobby-status">not connected</p>
+
+          <div id="lobby-menu" class="lobby-menu">
+            <button id="quick-btn" class="sketch-btn primary-btn">QUICK MATCH ⚡</button>
+            <button id="create-btn" class="sketch-btn">CREATE ROOM 🔑</button>
+            <div class="lobby-join">
+              <input id="join-code" class="code-input" maxlength="4" placeholder="CODE"
+                     autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Room code">
+              <button id="join-btn" class="sketch-btn">JOIN</button>
+            </div>
+          </div>
+
+          <div id="lobby-room" class="lobby-room" hidden>
+            <div class="room-code-wrap">
+              <span class="room-code-label">room code</span>
+              <span id="room-code" class="room-code">----</span>
+              <button id="copy-link-btn" class="sketch-btn mini-btn">copy link 🔗</button>
+            </div>
+            <p id="room-seat" class="room-seat"></p>
+            <p id="room-msg" class="room-msg">waiting for an opponent…</p>
+            <button id="leave-btn" class="sketch-btn mini-btn">leave room</button>
+          </div>
+
+          <button id="lobby-back-btn" class="sketch-btn mini-btn">← solo mode ✏️</button>
         </div>
       </div>
+
+      <!-- Round countdown, drawn over the board -->
+      <div id="countdown" class="countdown" hidden></div>
 
       <!-- Combo Floating Banner -->
       <div id="combo-badge" class="combo-badge">COMBO x2! 🔥</div>
@@ -105,7 +137,7 @@
         <button class="dpad-btn down" data-dir="DOWN" aria-label="Down">▼</button>
       </div>
       <div class="speed-control">
-        <div class="vs-hint">P1 D-pad · P2 swipe</div>
+        <div class="vs-hint">steer: swipe · D-pad · arrows</div>
         <button id="pause-btn" class="sketch-btn mini-btn">⏸ Pause</button>
         <button id="sound-btn" class="sketch-btn mini-btn">🔊 Sound</button>
       </div>
@@ -119,6 +151,12 @@
     </aside>
   </div>
 
+  <script>
+    // Duel server for the online VS mode. Leave empty to use the page's own origin,
+    // which is what `npm start --prefix server` serves during development.
+    window.SKETCHY_DUEL_SERVER = '';
+  </script>
+  <script src="net.js"></script>
   <script src="game.js"></script>
 </body>
 </html>
