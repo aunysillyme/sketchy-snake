@@ -520,3 +520,56 @@ canvas {
     margin-bottom: 6px;
   }
 }
+
+/* --- VS Duel Mode --- */
+.mode-btn {
+  margin-top: 8px;
+  font-size: 0.95rem;
+  padding: 6px 16px;
+  background: #FFF;
+  color: var(--purple-ink);
+  border-color: var(--purple-ink);
+  box-shadow: 3px 3px 0px var(--purple-ink);
+}
+
+.mode-btn:active {
+  box-shadow: 1px 1px 0px var(--purple-ink);
+}
+
+body.mode-vs .mode-btn {
+  background: var(--purple-ink);
+  color: #FFF;
+  border-color: #0F172A;
+}
+
+/* In a duel the two score cards become the P1 / P2 round tallies. */
+body.mode-vs .score-card.current {
+  border-color: var(--cobalt-blue);
+  box-shadow: 2px 2px 0px var(--cobalt-blue);
+}
+
+body.mode-vs .score-card.current .value {
+  color: var(--cobalt-blue);
+}
+
+body.mode-vs .score-card.best {
+  background: #FAF5FF;
+  border-color: var(--purple-ink);
+  box-shadow: 2px 2px 0px var(--purple-ink);
+}
+
+body.mode-vs .score-card.best .value {
+  color: var(--purple-ink);
+}
+
+.vs-hint {
+  display: none;
+  font-size: 0.78rem;
+  color: var(--purple-ink);
+  text-align: center;
+  letter-spacing: 0.3px;
+}
+
+body.mode-vs .vs-hint {
+  display: block;
+}

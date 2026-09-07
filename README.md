@@ -35,6 +35,25 @@ Instead of a standard clean grid, **Sketchy Snake** is built to feel like an ill
 
 ---
 
+## ⚔️ VS Duel Mode (Tron-style)
+
+Tap **VS DUEL MODE ⚔️** on the start card for local two-player duels on one screen:
+
+* **Random spawns:** both snakes drop onto random, well-separated cells facing open paper.
+* **Permanent pencil trails:** nobody's tail shrinks — every stroke you draw stays on the page as a wall.
+* **Win condition:** survive. Force your rival into your trail, their own trail, or the margin. Same-cell and head-on crashes are a **Double Smudge** (no point).
+* **Munchkins are erasers:** eating one scores points *and* rubs out 5 of your own tail segments — the only way to open up space again.
+* **Match tally:** the two score cards become the P1 ✏️ / P2 ⚔️ round tallies; **NEXT ROUND ⚔️** re-racks with fresh spawns.
+
+| Player | Keyboard | Touch |
+|---|---|---|
+| **P1** ✏️ (cobalt) | `W` `A` `S` `D` | On-screen D-pad |
+| **P2** ⚔️ (purple) | `Arrow Keys` | Swipe the paper |
+
+Duels run at a fixed tempo with no speed-up, so neither player gets an advantage from scoring.
+
+---
+
 ## 🥑 The Munchkin Food Menu
 
 | Munchkin | Points | Special Effect |
@@ -66,7 +85,7 @@ The game features an embedded, zero-dependency **Web Audio API synthesizer & seq
 |---|---|---|
 | **Mobile / Touch** | Swipe Gestures | Slither in any direction |
 | **Mobile / Touch** | On-screen D-Pad | Steer with tactile feedback |
-| **Desktop / Keyboard** | `Arrow Keys` / `WASD` | Steer snake |
+| **Desktop / Keyboard** | `Arrow Keys` / `WASD` | Steer snake (solo: both work) |
 | **Desktop / Keyboard** | `Spacebar` | Pause / Resume |
 | **Android** | Hardware Haptics | Micro-vibrations on every bite (`navigator.vibrate`) |
 
