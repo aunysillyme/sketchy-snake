@@ -1,0 +1,9 @@
+{
+  "appId": "com.aunysillyme.sketchysnake",
+  "appName": "Sketchy Snake",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "android": {
+    "backgroundColor": "#FCFAF6"
+  }
+}

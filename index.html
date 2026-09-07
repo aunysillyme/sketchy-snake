@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#fcfaf7">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>Sketchy Snake ✏️🐍</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Patrick+Hand&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="sketchbook-container">
+    <!-- Sketchbook Margin Accents & Annotations -->
+    <header class="header">
+      <div class="title-wrap">
+        <h1 class="title">sketchy snake <span class="scribble-tag">v1.0 ✏️</span></h1>
+        <p class="subtitle">progress not perfection · eat the munchkins</p>
+      </div>
+      <div class="score-board">
+        <div class="score-card current">
+          <span class="label">SCORE</span>
+          <span id="score-val" class="value">0</span>
+        </div>
+        <div class="score-card best">
+          <span class="label">BEST</span>
+          <span id="best-val" class="value">0</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Interactive Canvas Arena -->
+    <div class="canvas-wrapper" id="canvas-wrap">
+      <canvas id="game-canvas"></canvas>
+      
+      <!-- Hand-drawn Overlay for Start / Pause / Game Over -->
+      <div id="game-overlay" class="overlay">
+        <div class="overlay-content">
+          <div class="doodle-cat" id="overlay-icon">🐱💤</div>
+          <h2 id="overlay-title">Ready to Sketch?</h2>
+          <p id="overlay-msg">Swipe or use arrows to slither. Collect coffee, avocados & pumpkin heads!</p>
+          <div class="mantra-quote">"coffee = fuel ☕ · duality is architecture 🧡"</div>
+          <button id="start-btn" class="sketch-btn primary-btn">START SLITHERING ✏️</button>
+        </div>
+      </div>
+
+      <!-- Combo Floating Banner -->
+      <div id="combo-badge" class="combo-badge">COMBO x2! 🔥</div>
+    </div>
+
+    <!-- Interactive Music Player & Doodles Widget -->
+    <div class="music-doodle-bar">
+      <div class="music-info">
+        <button id="music-play-btn" class="music-play-btn" aria-label="Play/Pause Music">▶</button>
+        <div class="track-details">
+          <div class="track-header">
+            <span id="track-name" class="track-name">Blue Lightning ⚡</span>
+            <button id="next-track-btn" class="next-track-btn" title="Next track">⏭</button>
+          </div>
+          <div class="track-progress-container" id="track-progress-wrap">
+            <div class="track-progress-bar" id="track-progress-bar"></div>
+            <span class="track-time" id="track-time">0:00 / 2:46</span>
+          </div>
+        </div>
+      </div>
+      <div class="heart-signature">built with 🧡</div>
+    </div>
+
+    <!-- Mobile Touch Controls (D-Pad) -->
+    <div class="touch-controls" id="touch-controls">
+      <div class="dpad">
+        <button class="dpad-btn up" data-dir="UP" aria-label="Up">▲</button>
+        <div class="dpad-middle">
+          <button class="dpad-btn left" data-dir="LEFT" aria-label="Left">◀</button>
+          <div class="dpad-center">☕</div>
+          <button class="dpad-btn right" data-dir="RIGHT" aria-label="Right">▶</button>
+        </div>
+        <button class="dpad-btn down" data-dir="DOWN" aria-label="Down">▼</button>
+      </div>
+      <div class="speed-control">
+        <button id="pause-btn" class="sketch-btn mini-btn">⏸ Pause</button>
+        <button id="sound-btn" class="sketch-btn mini-btn">🔊 Sound</button>
+      </div>
+    </div>
+
+    <!-- Marginalia Doodles & Stickers -->
+    <aside class="marginalia">
+      <div class="doodle doodle-plant">🪴</div>
+      <div class="doodle doodle-sparkles">✨</div>
+      <div class="doodle doodle-arrow">↗ don't hit the margins!</div>
+    </aside>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
