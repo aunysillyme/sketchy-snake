@@ -17,5 +17,9 @@
     return projectile;
   }
 
-  return { wouldHitSelf, advanceProjectile };
+  function nextPlayer(player) {
+    return player === 'p1' ? 'p2' : 'p1';
+  }
+
+  return { wouldHitSelf, advanceProjectile, nextPlayer };
 });

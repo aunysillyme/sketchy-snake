@@ -16,3 +16,11 @@ test('a newly fired projectile advances to the adjacent cell first', () => {
   rules.advanceProjectile(shot);
   assert.deepEqual(shot, { x: 6, y: 5, dx: 1, dy: 0, life: 13 });
 });
+
+test('hot-seat turns alternate forever', () => {
+  let player = 'p1';
+  player = rules.nextPlayer(player);
+  assert.equal(player, 'p2');
+  player = rules.nextPlayer(player);
+  assert.equal(player, 'p1');
+});

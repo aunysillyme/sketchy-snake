@@ -48,7 +48,7 @@
   let snake2 = [];
   let direction2 = 'LEFT';
   let nextDirection2 = 'LEFT';
-  let currentTurn = 'p1'; // 'p1' | 'p2' (alternating turns in vs mode)
+  let currentTurn = 'p1'; // 'p1' | 'p2' (one complete run per player in local duel)
   let onlineSeat = null;
   let onlineRoom = null;
   let food = null;
@@ -585,20 +585,11 @@
   }
 
   function renderSnake() {
-    if (mode === 'vs' || mode === 'online') {
+    if (mode === 'online') {
       drawSnakeBody(snake, direction, PLAYERS.p1, 0, false);
       drawSnakeBody(snake2, direction2, PLAYERS.p2, 0, false);
-      if (isRunning && mode === 'vs') {
-        ctx.save();
-        ctx.font = `${Math.max(12, cellSize * 0.75)}px sans-serif`;
-        ctx.textAlign = 'center';
-        if (currentTurn === 'p1' && snake.length > 0) {
-          ctx.fillText('✏️', snake[0].x * cellSize + cellSize / 2, snake[0].y * cellSize - 4);
-        } else if (currentTurn === 'p2' && snake2.length > 0) {
-          ctx.fillText('⚔️', snake2[0].x * cellSize + cellSize / 2, snake2[0].y * cellSize - 4);
-        }
-        ctx.restore();
-      }
+    } else if (mode === 'vs') {
+      drawSnakeBody(snake, direction, PLAYERS[currentTurn], 0, false);
     } else {
       drawSnakeBody(snake, direction, PLAYERS.p1, combo, isGhostMode);
     }
@@ -607,7 +598,7 @@
   // --- Game Mechanics ---
   function cellOccupied(x, y) {
     if (snake.some(seg => seg.x === x && seg.y === y)) return true;
-    if ((mode === 'vs' || mode === 'online') && snake2.some(seg => seg.x === x && seg.y === y)) return true;
+    if (mode === 'online' && snake2.some(seg => seg.x === x && seg.y === y)) return true;
     if (erasers.some(e => e.x === x && e.y === y)) return true;
     return false;
   }
@@ -731,9 +722,18 @@
     }
   }
 
+  function currentScore() {
+    return mode === 'vs' && currentTurn === 'p2' ? score2 : score;
+  }
+
+  function addScore(points) {
+    if (mode === 'vs' && currentTurn === 'p2') score2 += points;
+    else score += points;
+  }
+
   function update() {
     if (!isRunning || isPaused) return;
-    if (mode === 'vs' || mode === 'online') return;
+    if (mode === 'online') return;
 
     direction = nextDirection;
     const head = { ...snake[0] };
@@ -760,7 +760,7 @@
         if (e.x === p.x && e.y === p.y) {
           erasers.splice(j, 1);
           hit = true;
-          score += 40;
+          addScore(40);
           updateScoreUI();
           playSound('eraser_splat');
           triggerHaptic([30, 20, 40]);
@@ -780,20 +780,20 @@
         erasers.splice(i, 1);
       }
     }
-    if (score >= 15 && erasers.length === 0 && Math.random() < 0.08) {
+    if (currentScore() >= 15 && erasers.length === 0 && Math.random() < 0.08) {
       spawnEraser();
     }
 
     // 3. Wall Collision Check
     if (head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE) {
-      gameOver('Ouch! Hit the margin border!');
+      endRun('Ouch! Hit the margin border!');
       return;
     }
 
     // 4. Self Collision Check (Bypassed if Ghost Mode!)
     const willGrow = food && head.x === food.x && head.y === food.y;
     if (!isGhostMode && window.SketchyRules.wouldHitSelf(snake, head, willGrow)) {
-      gameOver('Tangled up in your own sketch!');
+      endRun('Tangled up in your own sketch!');
       return;
     }
 
@@ -803,7 +803,7 @@
       if (head.x === e.x && head.y === e.y) {
         if (isGhostMode) {
           erasers.splice(i, 1);
-          score += 30;
+          addScore(30);
           updateScoreUI();
           playSound('eraser_splat');
           triggerHaptic([30, 30]);
@@ -818,7 +818,7 @@
             spawnFloatingDoodle(head.x * cellSize, head.y * cellSize, 'ERASED 2 SEGMENTS! 🧼', '#EF4444');
             updateInkButtonState();
           } else {
-            gameOver('Erased by the rogue eraser 🧼!');
+            endRun('Erased by the rogue eraser 🧼!');
             return;
           }
         }
@@ -830,7 +830,7 @@
     // 6. Food Collision Check
     if (food && head.x === food.x && head.y === food.y) {
       const points = food.type.points * (combo > 0 ? combo + 1 : 1);
-      score += points;
+      addScore(points);
       updateScoreUI();
 
       combo++;
@@ -1043,6 +1043,7 @@
     score = 0;
     score2 = 0;
     matchWins = { p1: 0, p2: 0 };
+    currentTurn = 'p1';
     if (previousMode === 'online' && newMode !== 'online' && window.SketchyNet) window.SketchyNet.leave();
     if (newMode === 'solo') {
       bestScore = parseInt(localStorage.getItem('sketchy_snake_best') || '0', 10);
@@ -1073,7 +1074,7 @@
     document.getElementById('overlay-msg').innerHTML = mode === 'online'
       ? 'Create a private room, enter a friend’s code, or find a quick match. The server runs the shared board.'
       : isVs
-      ? 'Pass & Play: Take turns stepping 1 cell! Every step leaves a permanent pencil line. Box your rival in!<br>Munchkins act as erasers to shave your tail.<br><strong>Controls:</strong> Share the D-pad, swipe, or arrows on each turn.'
+      ? 'Pass & Play: P1 controls the snake until it crashes, then passes the game to P2. Scores carry forward while turns keep alternating.<br><strong>Controls:</strong> Share the D-pad, swipe, or arrow keys.'
       : 'Swipe or arrows to slither. <strong>[SPACE]</strong> or <strong>✏️ INK</strong> shoots lead! Beware rogue erasers 🧼 & grab highlighters for ghost immunity ✨';
     document.getElementById('overlay-icon').textContent = isVs ? '✏️⚔️🐍' : '🐱💤';
     document.getElementById('start-btn').textContent = mode === 'online' ? 'QUICK MATCH 🌐' : (isVs ? 'START DUEL ⚔️' : 'START SLITHERING ✏️');
@@ -1094,14 +1095,17 @@
 
   function startVsGame() {
     initAudio();
-    spawnVsPlayers();
-    currentTurn = 'p1';
-    score = 0;
-    score2 = 0;
+    snake = [{ x: 5, y: 8 }, { x: 4, y: 8 }, { x: 3, y: 8 }];
+    snake2 = [];
+    direction = 'RIGHT';
+    nextDirection = 'RIGHT';
     combo = 0;
     particles = [];
     inkProjectiles = [];
     erasers = [];
+    isGhostMode = false;
+    ghostSecondsLeft = 0;
+    clearInterval(ghostTimer);
     hideComboBadge();
     spawnFood();
     isRunning = true;
@@ -1111,6 +1115,7 @@
 
     document.getElementById('game-overlay').classList.add('hidden');
     clearInterval(gameInterval);
+    gameInterval = setInterval(update, BASE_SPEED_MS);
     draw();
   }
 
@@ -1118,7 +1123,7 @@
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     renderGrid();
     renderFood();
-    if (mode === 'solo') {
+    if (mode !== 'online') {
       renderErasers();
       renderProjectiles();
     }
@@ -1127,7 +1132,7 @@
   }
 
   function speedUp() {
-    const newSpeed = Math.max(MIN_SPEED_MS, BASE_SPEED_MS - Math.floor(score / 40) * 4);
+    const newSpeed = Math.max(MIN_SPEED_MS, BASE_SPEED_MS - Math.floor(currentScore() / 40) * 4);
     clearInterval(gameInterval);
     gameInterval = setInterval(update, newSpeed);
   }
@@ -1154,9 +1159,14 @@
   }
 
   function updateScoreUI() {
-    if (mode === 'vs' || mode === 'online') {
+    if (mode === 'online') {
       document.getElementById('score-val').textContent = matchWins.p1;
       document.getElementById('best-val').textContent = matchWins.p2;
+      return;
+    }
+    if (mode === 'vs') {
+      document.getElementById('score-val').textContent = score;
+      document.getElementById('best-val').textContent = score2;
       return;
     }
     document.getElementById('score-val').textContent = score;
@@ -1253,6 +1263,51 @@
     overlay.classList.remove('hidden');
   }
 
+  function endRun(reason) {
+    if (mode !== 'vs') {
+      gameOver(reason);
+      return;
+    }
+    isRunning = false;
+    clearInterval(gameInterval);
+    clearInterval(ghostTimer);
+    const finishedPlayer = currentTurn;
+    currentTurn = window.SketchyRules.nextPlayer(currentTurn);
+    triggerHaptic([60, 50, 80]);
+    playSound('gameover');
+    updateScoreUI();
+    updateTurnUI();
+    const overlay = document.getElementById('game-overlay');
+    document.getElementById('overlay-title').textContent = `${finishedPlayer.toUpperCase()}'s turn is over`;
+    document.getElementById('overlay-msg').textContent = `${reason} Pass the game to ${currentTurn.toUpperCase()}. Scores — P1: ${score} · P2: ${score2}.`;
+    document.getElementById('overlay-icon').textContent = currentTurn === 'p1' ? '✏️🐍' : '⚔️🐍';
+    document.getElementById('start-btn').textContent = `START ${currentTurn.toUpperCase()}'S TURN`;
+    overlay.classList.remove('hidden');
+  }
+
+  function quitToModeScreen() {
+    clearInterval(gameInterval);
+    clearInterval(ghostTimer);
+    clearTimeout(comboTimer);
+    if (mode === 'online' && window.SketchyNet) window.SketchyNet.leave();
+    isRunning = false;
+    isPaused = false;
+    onlineSeat = null;
+    onlineRoom = null;
+    snake = [];
+    snake2 = [];
+    food = null;
+    erasers = [];
+    inkProjectiles = [];
+    score = 0;
+    score2 = 0;
+    matchWins = { p1: 0, p2: 0 };
+    currentTurn = 'p1';
+    document.getElementById('pause-btn').textContent = '⏸ Pause';
+    applyModeUI();
+    draw();
+  }
+
   function togglePause() {
     if (!isRunning) return;
     isPaused = !isPaused;
@@ -1272,10 +1327,6 @@
     initAudio();
     if (mode === 'online') {
       if (onlineSeat === 'p1' || onlineSeat === 'p2') window.SketchyNet.sendDir(newDir);
-      return;
-    }
-    if (mode === 'vs') {
-      stepDuelTurn(newDir);
       return;
     }
     if (isReverse(newDir, direction)) return;
@@ -1408,6 +1459,7 @@
       if (!isMusicPlaying) toggleMusic(true);
     });
     document.getElementById('pause-btn').addEventListener('click', togglePause);
+    document.getElementById('quit-btn').addEventListener('click', quitToModeScreen);
     
     const soundBtn = document.getElementById('sound-btn');
     soundBtn.addEventListener('click', () => {
