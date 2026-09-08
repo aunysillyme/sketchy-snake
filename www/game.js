@@ -48,6 +48,7 @@
   let snake2 = [];
   let direction2 = 'LEFT';
   let nextDirection2 = 'LEFT';
+  let currentTurn = 'p1'; // 'p1' | 'p2' (alternating turns in vs mode)
   let food = null;
   let score = 0;
   let score2 = 0;
@@ -585,6 +586,17 @@
     if (mode === 'vs') {
       drawSnakeBody(snake, direction, PLAYERS.p1, 0, false);
       drawSnakeBody(snake2, direction2, PLAYERS.p2, 0, false);
+      if (isRunning) {
+        ctx.save();
+        ctx.font = `${Math.max(12, cellSize * 0.75)}px sans-serif`;
+        ctx.textAlign = 'center';
+        if (currentTurn === 'p1' && snake.length > 0) {
+          ctx.fillText('✏️', snake[0].x * cellSize + cellSize / 2, snake[0].y * cellSize - 4);
+        } else if (currentTurn === 'p2' && snake2.length > 0) {
+          ctx.fillText('⚔️', snake2[0].x * cellSize + cellSize / 2, snake2[0].y * cellSize - 4);
+        }
+        ctx.restore();
+      }
     } else {
       drawSnakeBody(snake, direction, PLAYERS.p1, combo, isGhostMode);
     }
@@ -719,10 +731,7 @@
 
   function update() {
     if (!isRunning || isPaused) return;
-    if (mode === 'vs') {
-      updateVs();
-      return;
-    }
+    if (mode === 'vs') return;
 
     direction = nextDirection;
     const head = { ...snake[0] };
@@ -871,38 +880,45 @@
     return null;
   }
 
-  function updateVs() {
-    direction = nextDirection;
-    direction2 = nextDirection2;
+  function stepDuelTurn(newDir) {
+    if (!isRunning || isPaused || mode !== 'vs') return;
 
-    const head1 = stepHead(snake[0], direction);
-    const head2 = stepHead(snake2[0], direction2);
+    const isP1 = currentTurn === 'p1';
+    const activeSnake = isP1 ? snake : snake2;
+    const rivalSnake = isP1 ? snake2 : snake;
+    const curDir = isP1 ? direction : direction2;
 
-    // Trails never shrink on their own in duel mode; every drawn segment is lethal.
-    let cause1 = crashCause(head1, snake2);
-    let cause2 = crashCause(head2, snake);
+    if (isReverse(newDir, curDir)) return;
 
-    // Both heads onto the same cell, or heads swapping cells, is a mutual wipeout.
-    const sameCell = head1.x === head2.x && head1.y === head2.y;
-    const swapped = head1.x === snake2[0].x && head1.y === snake2[0].y &&
-                    head2.x === snake[0].x && head2.y === snake[0].y;
-    if (sameCell || swapped) {
-      cause1 = cause1 || 'headOn';
-      cause2 = cause2 || 'headOn';
+    if (isP1) {
+      direction = newDir;
+      nextDirection = newDir;
+    } else {
+      direction2 = newDir;
+      nextDirection2 = newDir;
     }
 
-    if (cause1 || cause2) {
-      roundOver(cause1, cause2);
+    const nextHead = stepHead(activeSnake[0], newDir);
+
+    let crash = null;
+    if (hitsWall(nextHead)) {
+      crash = 'margin';
+    } else if (rivalSnake.some(seg => seg.x === nextHead.x && seg.y === nextHead.y)) {
+      crash = 'rival';
+    } else if (activeSnake.some(seg => seg.x === nextHead.x && seg.y === nextHead.y)) {
+      crash = 'own';
+    }
+
+    if (crash) {
+      roundOver(isP1 ? crash : null, !isP1 ? crash : null);
       return;
     }
 
-    snake.unshift(head1);
-    snake2.unshift(head2);
-    // No pop: the permanent trail is the weapon.
+    activeSnake.unshift(nextHead);
+    eatInVs(nextHead, activeSnake, currentTurn);
 
-    eatInVs(head1, snake, 'p1');
-    eatInVs(head2, snake2, 'p2');
-
+    currentTurn = isP1 ? 'p2' : 'p1';
+    updateTurnUI();
     draw();
   }
 
@@ -997,6 +1013,7 @@
     msg += ` Munchkins — P1: ${score} · P2: ${score2}. Match: ${matchWins.p1}–${matchWins.p2}.`;
 
     updateScoreUI();
+    updateTurnUI();
     const overlay = document.getElementById('game-overlay');
     document.getElementById('overlay-title').textContent = title;
     document.getElementById('overlay-msg').textContent = msg;
@@ -1024,6 +1041,9 @@
     score = 0;
     score2 = 0;
     matchWins = { p1: 0, p2: 0 };
+    if (newMode === 'solo') {
+      bestScore = parseInt(localStorage.getItem('sketchy_snake_best') || '0', 10);
+    }
     applyModeUI();
     draw();
   }
@@ -1044,12 +1064,16 @@
     const overlay = document.getElementById('game-overlay');
     document.getElementById('overlay-title').textContent = isVs ? 'Tron Duel! ⚔️' : 'Ready to Sketch?';
     document.getElementById('overlay-msg').innerHTML = isVs
-      ? 'Two snakes, random spawns, permanent pencil trails. Box your rival in! Munchkins act as erasers.<br><strong>P1:</strong> WASD or D-pad · <strong>P2:</strong> Arrow keys or swipe.'
+      ? 'Pass & Play: Take turns stepping 1 cell! Every step leaves a permanent pencil line. Box your rival in!<br>Munchkins act as erasers to shave your tail.<br><strong>Controls:</strong> Share the D-pad, swipe, or arrows on each turn.'
       : 'Swipe or arrows to slither. <strong>[SPACE]</strong> or <strong>✏️ INK</strong> shoots lead! Beware rogue erasers 🧼 & grab highlighters for ghost immunity ✨';
     document.getElementById('overlay-icon').textContent = isVs ? '✏️⚔️🐍' : '🐱💤';
     document.getElementById('start-btn').textContent = isVs ? 'START DUEL ⚔️' : 'START SLITHERING ✏️';
     overlay.classList.remove('hidden');
+    if (mode === 'solo') {
+      bestScore = parseInt(localStorage.getItem('sketchy_snake_best') || '0', 10);
+    }
     updateScoreUI();
+    updateTurnUI();
     updateInkButtonState();
   }
 
@@ -1061,6 +1085,7 @@
   function startVsGame() {
     initAudio();
     spawnVsPlayers();
+    currentTurn = 'p1';
     score = 0;
     score2 = 0;
     combo = 0;
@@ -1068,15 +1093,15 @@
     inkProjectiles = [];
     erasers = [];
     hideComboBadge();
-    updateScoreUI();
-
     spawnFood();
     isRunning = true;
     isPaused = false;
+    updateScoreUI();
+    updateTurnUI();
 
     document.getElementById('game-overlay').classList.add('hidden');
     clearInterval(gameInterval);
-    gameInterval = setInterval(update, VS_SPEED_MS);
+    draw();
   }
 
   function draw() {
@@ -1128,7 +1153,32 @@
     if (score > bestScore) {
       bestScore = score;
       localStorage.setItem('sketchy_snake_best', bestScore.toString());
-      document.getElementById('best-val').textContent = bestScore;
+    }
+    document.getElementById('best-val').textContent = bestScore;
+  }
+
+  function updateTurnUI() {
+    const card1 = document.querySelector('.score-card.current');
+    const card2 = document.querySelector('.score-card.best');
+    const badge = document.getElementById('power-badge');
+
+    if (mode !== 'vs' || !isRunning) {
+      if (card1) card1.classList.remove('active-turn');
+      if (card2) card2.classList.remove('active-turn');
+      if (badge && !isGhostMode) {
+        badge.classList.remove('active', 'p1-turn', 'p2-turn');
+      }
+      return;
+    }
+
+    const isP1 = currentTurn === 'p1';
+    if (card1) card1.classList.toggle('active-turn', isP1);
+    if (card2) card2.classList.toggle('active-turn', !isP1);
+
+    if (badge) {
+      badge.textContent = isP1 ? "✏️ P1'S TURN (YOUR MOVE)" : "⚔️ P2'S TURN (YOUR MOVE)";
+      badge.classList.remove('p1-turn', 'p2-turn');
+      badge.classList.add('active', isP1 ? 'p1-turn' : 'p2-turn');
     }
   }
 
@@ -1155,6 +1205,7 @@
     if (powerBadge) powerBadge.classList.remove('active');
 
     updateScoreUI();
+    updateTurnUI();
     updateInkButtonState();
 
     spawnFood();
@@ -1174,12 +1225,19 @@
     const powerBadge = document.getElementById('power-badge');
     if (powerBadge) powerBadge.classList.remove('active');
 
+    if (score > bestScore) {
+      bestScore = score;
+      localStorage.setItem('sketchy_snake_best', bestScore.toString());
+    }
+    updateScoreUI();
+    updateTurnUI();
+
     triggerHaptic([60, 50, 80]);
     playSound('gameover');
 
     const overlay = document.getElementById('game-overlay');
     document.getElementById('overlay-title').textContent = 'Sketch Paused!';
-    document.getElementById('overlay-msg').textContent = `${reason} Final Score: ${score}`;
+    document.getElementById('overlay-msg').textContent = `${reason} Final Score: ${score} · Best: ${bestScore}`;
     document.getElementById('overlay-icon').textContent = '✏️💥';
     document.getElementById('start-btn').textContent = 'RE-SKETCH ↺';
     overlay.classList.remove('hidden');
@@ -1200,28 +1258,23 @@
            (newDir === 'RIGHT' && curDir === 'LEFT');
   }
 
-  function handleDirection(newDir, player = 'p1') {
+  function handleDirection(newDir) {
     initAudio();
-    // Outside a duel every input drives player one
-    const who = (mode === 'vs' && player === 'p2') ? 'p2' : 'p1';
-    const curDir = who === 'p2' ? direction2 : direction;
-    if (isReverse(newDir, curDir)) return;
-    if (who === 'p2') nextDirection2 = newDir;
-    else nextDirection = newDir;
+    if (mode === 'vs') {
+      stepDuelTurn(newDir);
+      return;
+    }
+    if (isReverse(newDir, direction)) return;
+    nextDirection = newDir;
   }
 
   function setupControls() {
     // Keyboard
     window.addEventListener('keydown', (e) => {
-      // In a duel, arrows belong to P2 and WASD to P1; in solo both steer the one snake.
-      if (e.code === 'KeyW') { e.preventDefault(); handleDirection('UP', 'p1'); }
-      else if (e.code === 'KeyS') { e.preventDefault(); handleDirection('DOWN', 'p1'); }
-      else if (e.code === 'KeyA') { e.preventDefault(); handleDirection('LEFT', 'p1'); }
-      else if (e.code === 'KeyD') { e.preventDefault(); handleDirection('RIGHT', 'p1'); }
-      else if (e.code === 'ArrowUp') { e.preventDefault(); handleDirection('UP', mode === 'vs' ? 'p2' : 'p1'); }
-      else if (e.code === 'ArrowDown') { e.preventDefault(); handleDirection('DOWN', mode === 'vs' ? 'p2' : 'p1'); }
-      else if (e.code === 'ArrowLeft') { e.preventDefault(); handleDirection('LEFT', mode === 'vs' ? 'p2' : 'p1'); }
-      else if (e.code === 'ArrowRight') { e.preventDefault(); handleDirection('RIGHT', mode === 'vs' ? 'p2' : 'p1'); }
+      if (e.code === 'KeyW' || e.code === 'ArrowUp') { e.preventDefault(); handleDirection('UP'); }
+      else if (e.code === 'KeyS' || e.code === 'ArrowDown') { e.preventDefault(); handleDirection('DOWN'); }
+      else if (e.code === 'KeyA' || e.code === 'ArrowLeft') { e.preventDefault(); handleDirection('LEFT'); }
+      else if (e.code === 'KeyD' || e.code === 'ArrowRight') { e.preventDefault(); handleDirection('RIGHT'); }
       else if (e.code === 'Space') {
         e.preventDefault();
         if (!isRunning) {
@@ -1245,17 +1298,17 @@
       });
     }
 
-    // Touch D-Pad buttons (steers P1 in both Solo and VS Duel)
+    // Touch D-Pad buttons (shared across Solo and VS Duel turns)
     document.querySelectorAll('.dpad-btn').forEach(btn => {
       btn.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         const dir = btn.getAttribute('data-dir');
-        handleDirection(dir, 'p1');
+        handleDirection(dir);
         triggerHaptic([15]);
       });
     });
 
-    // Swipe Gestures on Canvas (steers P2 in VS Duel, P1 in Solo)
+    // Swipe Gestures on Canvas (shared across Solo and VS Duel turns)
     let touchStartX = 0;
     let touchStartY = 0;
     const canvasWrap = document.getElementById('canvas-wrap');
@@ -1274,11 +1327,10 @@
       const absDy = Math.abs(dy);
 
       if (Math.max(absDx, absDy) > 25) {
-        const pTag = mode === 'vs' ? 'p2' : 'p1';
         if (absDx > absDy) {
-          handleDirection(dx > 0 ? 'RIGHT' : 'LEFT', pTag);
+          handleDirection(dx > 0 ? 'RIGHT' : 'LEFT');
         } else {
-          handleDirection(dy > 0 ? 'DOWN' : 'UP', pTag);
+          handleDirection(dy > 0 ? 'DOWN' : 'UP');
         }
       }
     }, { passive: true });

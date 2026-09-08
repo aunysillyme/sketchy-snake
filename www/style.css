@@ -707,9 +707,33 @@ body.mode-vs .action-btn-row {
   pointer-events: none;
 }
 
-body.mode-vs .hud-status-banner,
 body.mode-vs .mantra-quote {
   display: none !important;
+}
+
+/* VS Duel Turn Indicators */
+body.mode-vs .score-card.current.active-turn {
+  border-color: var(--cobalt-blue);
+  box-shadow: 0 0 10px rgba(43, 76, 126, 0.5), 3px 3px 0px var(--cobalt-blue);
+  transform: scale(1.05);
+}
+
+body.mode-vs .score-card.best.active-turn {
+  border-color: var(--magenta-pink);
+  box-shadow: 0 0 10px rgba(190, 24, 93, 0.5), 3px 3px 0px var(--magenta-pink);
+  transform: scale(1.05);
+}
+
+.power-badge.p1-turn {
+  background: var(--cobalt-blue) !important;
+  color: #FFF !important;
+  border-color: #1E3557 !important;
+}
+
+.power-badge.p2-turn {
+  background: var(--magenta-pink) !important;
+  color: #FFF !important;
+  border-color: #831843 !important;
 }
 
 /* --- Community Credits Modal --- */
