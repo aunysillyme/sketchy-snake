@@ -1070,7 +1070,7 @@
     document.getElementById('online-controls').classList.toggle('hidden', mode !== 'online');
 
     const overlay = document.getElementById('game-overlay');
-    document.getElementById('overlay-title').textContent = mode === 'online' ? 'Online Tron Duel! 🌐' : (isVs ? 'Tron Duel! ⚔️' : 'Ready to Sketch?');
+    document.getElementById('overlay-title').textContent = mode === 'online' ? 'Online Duel! 🌐' : (isVs ? 'Pass & Play Duel! ⚔️' : 'Ready to Sketch?');
     document.getElementById('overlay-msg').innerHTML = mode === 'online'
       ? 'Create a private room, enter a friend’s code, or find a quick match. The server runs the shared board.'
       : isVs
