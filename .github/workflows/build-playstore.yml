@@ -46,10 +46,32 @@ jobs:
           npx cap sync android
 
       - name: Build Android App Bundle (AAB)
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/sketchy-snake-release.keystore
+        shell: bash
         run: |
+          set -euo pipefail
+          : "${ANDROID_KEYSTORE_BASE64:?Configure the replacement release keystore secret}"
+          : "${ANDROID_KEYSTORE_PASSWORD:?Missing keystore password secret}"
+          : "${ANDROID_KEY_ALIAS:?Missing key alias secret}"
+          : "${ANDROID_KEY_PASSWORD:?Missing key password secret}"
+          umask 077
+          trap 'rm -f "$ANDROID_KEYSTORE_PATH"' EXIT
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
+          unset ANDROID_KEYSTORE_BASE64
           cd android
           chmod +x gradlew
           ./gradlew bundleRelease --stacktrace
+
+      - name: Remove temporary signing material
+        if: always()
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/sketchy-snake-release.keystore
+        run: rm -f "$ANDROID_KEYSTORE_PATH"
 
       - name: Upload Play Store AAB
         uses: actions/upload-artifact@v4

@@ -19,6 +19,7 @@ const { WebSocketServer } = require('ws');
 
 const duel = require('./duel');
 const { RoomManager, RECONNECT_GRACE_MS } = require('./rooms');
+const { validMessage, MAX_PAYLOAD_BYTES } = require('./protocol');
 
 const PORT = process.env.PORT || 8787;
 const STATIC_ROOT = path.resolve(__dirname, '..');
@@ -39,8 +40,15 @@ const manager = new RoomManager();
 // --- Static file serving (development convenience) --------------------------
 
 function serveStatic(req, res) {
-  const url = new URL(req.url, 'http://localhost');
-  let rel = decodeURIComponent(url.pathname);
+  let rel;
+  try {
+    const url = new URL(req.url, 'http://localhost');
+    rel = decodeURIComponent(url.pathname);
+    if (rel.includes('\0')) throw new URIError('NUL in pathname');
+  } catch (e) {
+    res.writeHead(400, { 'Content-Type': 'text/plain' }).end('Bad request');
+    return;
+  }
   if (rel === '/') rel = '/index.html';
 
   const filePath = path.join(STATIC_ROOT, rel);
@@ -85,6 +93,7 @@ function originAllowed(origin) {
 
 const wss = new WebSocketServer({
   server,
+  maxPayload: MAX_PAYLOAD_BYTES,
   verifyClient: ({ origin }) => originAllowed(origin)
 });
 
@@ -123,6 +132,47 @@ function detach(socket) {
   }
 }
 
+function dispatch(socket, msg) {
+  switch (msg.t) {
+    case 'create': {
+      const room = manager.create({ isPublic: false });
+      seatInto(socket, room, { name: msg.name });
+      break;
+    }
+
+    case 'join': {
+      const room = manager.get(msg.room);
+      if (!room) return fail(socket, 'no_room', `No duel found with code ${String(msg.room || '').toUpperCase()}.`);
+      seatInto(socket, room, { name: msg.name, token: msg.token });
+      break;
+    }
+
+    case 'quick': {
+      const room = manager.quickMatch();
+      seatInto(socket, room, { name: msg.name });
+      break;
+    }
+
+    case 'dir': {
+      if (socket.room) socket.room.input(socket, msg.d);
+      break;
+    }
+
+    case 'leave': {
+      detach(socket);
+      send(socket, { t: 'left' });
+      break;
+    }
+
+    case 'ping':
+      send(socket, { t: 'pong', at: msg.at });
+      break;
+
+    default:
+      fail(socket, 'unknown', `Unknown message type: ${msg.t}`);
+  }
+}
+
 wss.on('connection', (socket) => {
   socket.isAlive = true;
   socket.room = null;
@@ -138,45 +188,15 @@ wss.on('connection', (socket) => {
     } catch (e) {
       return fail(socket, 'bad_json', 'Could not parse that message.');
     }
-    if (!msg || typeof msg.t !== 'string') return;
+    if (!validMessage(msg)) return fail(socket, 'bad_message', 'Invalid message fields.');
 
-    switch (msg.t) {
-      case 'create': {
-        const room = manager.create({ isPublic: false });
-        seatInto(socket, room, { name: msg.name });
-        break;
-      }
-
-      case 'join': {
-        const room = manager.get(msg.room);
-        if (!room) return fail(socket, 'no_room', `No duel found with code ${String(msg.room || '').toUpperCase()}.`);
-        seatInto(socket, room, { name: msg.name, token: msg.token });
-        break;
-      }
-
-      case 'quick': {
-        const room = manager.quickMatch();
-        seatInto(socket, room, { name: msg.name });
-        break;
-      }
-
-      case 'dir': {
-        if (socket.room) socket.room.input(socket, msg.d);
-        break;
-      }
-
-      case 'leave': {
-        detach(socket);
-        send(socket, { t: 'left' });
-        break;
-      }
-
-      case 'ping':
-        send(socket, { t: 'pong', at: msg.at });
-        break;
-
-      default:
-        fail(socket, 'unknown', `Unknown message type: ${msg.t}`);
+    try {
+      dispatch(socket, msg);
+    } catch (e) {
+      // Contain unexpected handler failures without logging client data.
+      console.error('[sketchy-snake] message handler failed');
+      fail(socket, 'internal_error', 'Could not process that message.');
+      socket.close(1011, 'Message processing failed');
     }
   });
 

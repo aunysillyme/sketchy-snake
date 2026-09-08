@@ -118,9 +118,13 @@ function spawnFood(state) {
  * compare against the last *committed* direction so two intents inside one tick
  * cannot be combined into a 180.
  */
+function isDirection(dir) {
+  return typeof dir === 'string' && Object.hasOwn(DELTAS, dir);
+}
+
 function setIntent(state, seat, dir) {
   const player = state[seat];
-  if (!player || !DELTAS[dir]) return false;
+  if (!player || !isDirection(dir)) return false;
   if (dir === OPPOSITE[player.dir]) return false;
   player.intent = dir;
   return true;
@@ -223,6 +227,7 @@ module.exports = {
   SEATS,
   createRound,
   setIntent,
+  isDirection,
   step,
   serialize,
   cellId

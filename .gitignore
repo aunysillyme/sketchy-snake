@@ -1,1 +1,9 @@
 node_modules/
+
+# Signing material must stay outside the repository.
+*.keystore
+*.jks
+*.p12
+*.pfx
+.env
+.env.*

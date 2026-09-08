@@ -32,6 +32,16 @@ test('reversing into your own neck is rejected', () => {
   assert.strictEqual(s.p1.intent, 'UP');
 });
 
+test('malformed and inherited direction values cannot alter a player intent', () => {
+  const s = fixture([[5, 5], [4, 5], [3, 5]], 'RIGHT', [[12, 12], [13, 12], [14, 12]], 'LEFT');
+  for (const dir of [null, 42, ['UP'], { toString: null }, '__proto__', 'constructor', 'toString', 'valueOf']) {
+    assert.strictEqual(duel.setIntent(s, 'p1', dir), false);
+    assert.strictEqual(s.p1.intent, 'RIGHT');
+  }
+  duel.step(s);
+  assert.deepStrictEqual(s.p1.body[0], { x: 6, y: 5 });
+});
+
 test('two intents inside one tick cannot be combined into a 180', () => {
   const s = fixture([[5, 5], [4, 5], [3, 5]], 'RIGHT', [[12, 12], [13, 12], [14, 12]], 'LEFT');
   duel.setIntent(s, 'p1', 'UP');

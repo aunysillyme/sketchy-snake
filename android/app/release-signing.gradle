@@ -1,0 +1,38 @@
+// Never store release signing material in the checkout: the development server
+// serves files from there. Debug builds use Android's normal debug signing.
+def signingValues = [
+    storePath: providers.environmentVariable('ANDROID_KEYSTORE_PATH').orNull,
+    storePassword: providers.environmentVariable('ANDROID_KEYSTORE_PASSWORD').orNull,
+    keyAlias: providers.environmentVariable('ANDROID_KEY_ALIAS').orNull,
+    keyPassword: providers.environmentVariable('ANDROID_KEY_PASSWORD').orNull
+]
+def signingReady = signingValues.values().every { it != null && !it.isEmpty() }
+
+if (signingValues.values().any { it != null } && !signingReady) {
+    throw new GradleException('Set all four ANDROID_KEYSTORE_PATH, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD variables, or leave them all unset for debug builds.')
+}
+
+if (signingReady) {
+    def keyFile = new File(signingValues.storePath).canonicalFile
+    def checkout = rootProject.projectDir.parentFile.canonicalFile.toPath()
+    if (!new File(signingValues.storePath).isAbsolute() || !keyFile.isFile() || keyFile.toPath().startsWith(checkout)) {
+        throw new GradleException('ANDROID_KEYSTORE_PATH must be an existing absolute file path outside the repository.')
+    }
+    android.signingConfigs.create('release') {
+        storeFile keyFile
+        storePassword signingValues.storePassword
+        keyAlias signingValues.keyAlias
+        keyPassword signingValues.keyPassword
+    }
+    android.buildTypes.release.signingConfig = android.signingConfigs.release
+}
+
+// Do not accidentally emit an unsigned release when secrets are missing. Using
+// the resolved task graph also covers abbreviated Gradle task invocations.
+gradle.taskGraph.whenReady { graph ->
+    if (!signingReady && graph.allTasks.any {
+        it.project == project && it.name.toLowerCase(java.util.Locale.ROOT).contains('release')
+    }) {
+        throw new GradleException('Release signing is not configured. Supply all four ANDROID signing environment variables; see README.md.')
+    }
+}

@@ -145,6 +145,35 @@ npx cap open android
 cd android && ./gradlew assembleDebug
 ```
 
+### Release signing
+
+The previously committed release keystores and passwords are exposed. Removing
+them from the current checkout does **not** revoke copies or remove Git history.
+Before distributing another release, replace/reset the applicable app-signing
+or upload key with your distribution provider and retire the old identity.
+Do not reuse the exposed keystore as a CI secret.
+
+Release builds require these environment variables:
+
+| Variable | Value |
+|---|---|
+| `ANDROID_KEYSTORE_PATH` | Absolute path to the replacement keystore **outside this repository** |
+| `ANDROID_KEYSTORE_PASSWORD` | Keystore password |
+| `ANDROID_KEY_ALIAS` | Signing key alias |
+| `ANDROID_KEY_PASSWORD` | Signing key password |
+
+Load the values from your secret manager/environment, then run
+`cd android && ./gradlew bundleRelease`. Missing or partial signing configuration
+fails clearly; debug builds require none of these values. Do not put passwords
+in Gradle arguments, tracked files, or shell history.
+
+For the Play Store AAB workflow, configure GitHub Actions secrets
+`ANDROID_KEYSTORE_BASE64` (base64 contents of the replacement keystore),
+`ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`.
+The workflow restores the key under the runner's temporary directory with
+restricted permissions and removes it after the build. No credentials are
+included in the uploaded AAB artifact path.
+
 ---
 
 ## 📄 License

@@ -14,7 +14,7 @@ const { server, wss } = require('../index');
 let baseUrl;
 
 test.before(async () => {
-  await new Promise(resolve => server.listen(0, resolve));
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   baseUrl = `ws://127.0.0.1:${server.address().port}`;
 });
 
