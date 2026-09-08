@@ -600,3 +600,189 @@ canvas {
     margin-bottom: 6px;
   }
 }
+
+/* --- Mode Selector & VS Duel Mode UI --- */
+.mode-selector-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 10px 0;
+  width: 100%;
+}
+
+.mode-pill-btn {
+  font-family: 'Patrick Hand', cursive, sans-serif;
+  font-size: 1.05rem;
+  padding: 5px 14px;
+  border: 2px solid var(--pencil-charcoal);
+  border-radius: 20px;
+  background: #FFF;
+  color: var(--pencil-charcoal);
+  cursor: pointer;
+  box-shadow: 2px 2px 0px rgba(42, 43, 50, 0.2);
+  transition: all 0.15s ease;
+}
+
+.mode-pill-btn:hover {
+  transform: translateY(-1px);
+}
+
+.mode-pill-btn.active[data-mode="solo"] {
+  background: var(--cobalt-blue);
+  color: #FFF;
+  transform: translateY(-2px);
+  box-shadow: 2px 3px 0px var(--pencil-charcoal);
+}
+
+.mode-pill-btn.active[data-mode="vs"] {
+  background: var(--magenta-pink);
+  color: #FFF;
+  transform: translateY(-2px);
+  box-shadow: 2px 3px 0px var(--pencil-charcoal);
+}
+
+.overlay-aux-row {
+  margin-top: 10px;
+}
+
+.text-link-btn {
+  background: none;
+  border: none;
+  font-family: 'Caveat', cursive, sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--pencil-charcoal);
+  cursor: pointer;
+  text-decoration: underline dashed;
+  opacity: 0.85;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.text-link-btn:hover {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+/* VS Duel Customizations on body.mode-vs */
+body.mode-vs .score-card.current {
+  border-color: var(--cobalt-blue);
+  background: #F0F7FF;
+}
+body.mode-vs .score-card.current .label,
+body.mode-vs .score-card.current .value {
+  color: var(--cobalt-blue);
+}
+
+body.mode-vs .score-card.best {
+  border-color: var(--magenta-pink);
+  background: #FFF0F5;
+}
+body.mode-vs .score-card.best .label,
+body.mode-vs .score-card.best .value {
+  color: var(--magenta-pink);
+}
+
+body.mode-vs .action-btn-row,
+body.mode-vs .hud-status-banner {
+  display: none !important;
+}
+
+/* --- Community Credits Modal --- */
+.credits-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(42, 43, 50, 0.65);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  padding: 16px;
+}
+
+.credits-modal.hidden {
+  display: none !important;
+}
+
+.credits-box {
+  background: var(--paper-bg);
+  border: 3px solid var(--pencil-charcoal);
+  border-radius: 14px;
+  max-width: 440px;
+  width: 100%;
+  padding: 20px;
+  box-shadow: 6px 6px 0px var(--pencil-charcoal);
+  font-family: 'Patrick Hand', cursive, sans-serif;
+  color: var(--pencil-charcoal);
+  position: relative;
+  background-image: radial-gradient(#D5CEBE 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+.credits-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px dashed var(--pencil-charcoal);
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+
+.credits-header h3 {
+  font-family: 'Caveat', cursive, sans-serif;
+  font-size: 1.8rem;
+  margin: 0;
+  color: var(--cobalt-blue);
+}
+
+.close-credits-btn {
+  background: none;
+  border: none;
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: var(--pencil-charcoal);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.credit-entry {
+  margin: 10px 0;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1.5px solid var(--pencil-charcoal);
+  border-radius: 8px;
+  border-left: 5px solid var(--cobalt-blue);
+}
+
+.credit-entry:nth-child(2) {
+  border-left-color: var(--magenta-pink);
+}
+
+.credit-entry:nth-child(3) {
+  border-left-color: #10B981;
+}
+
+.credit-entry strong {
+  font-size: 1.05rem;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.credit-entry p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.credits-note {
+  margin-top: 14px;
+  font-size: 0.9rem;
+  text-align: center;
+  font-style: italic;
+  opacity: 0.85;
+}

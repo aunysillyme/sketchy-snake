@@ -10,6 +10,14 @@
   const GRID_SIZE = 18; // 18x18 grid
   const BASE_SPEED_MS = 135;
   const MIN_SPEED_MS = 65;
+  const VS_SPEED_MS = 140;
+  const VS_ERASE_ON_EAT = 5;
+  const VS_MIN_SPAWN_GAP = 8;
+
+  const PLAYERS = {
+    p1: { head: '#2B4C7E', headStroke: '#1E3557', bodyNear: '#2B4C7E', bodyFar: '#4A6FA5', label: 'P1 ✏️' },
+    p2: { head: '#BE185D', headStroke: '#831843', bodyNear: '#E11D48', bodyFar: '#F43F5E', label: 'P2 ⚔️' }
+  };
 
   const MUNCHKIN_TYPES = [
     { name: 'avocado', label: '🥑 Avocado Head', color: '#10B981', points: 10, quote: 'fresh munchkin!' },
@@ -33,11 +41,17 @@
   // --- State Variables ---
   let canvas, ctx;
   let cellSize = 20;
+  let mode = 'solo'; // 'solo' | 'vs'
   let snake = [];
   let direction = 'RIGHT';
   let nextDirection = 'RIGHT';
+  let snake2 = [];
+  let direction2 = 'LEFT';
+  let nextDirection2 = 'LEFT';
   let food = null;
   let score = 0;
+  let score2 = 0;
+  let matchWins = { p1: 0, p2: 0 };
   let bestScore = parseInt(localStorage.getItem('sketchy_snake_best') || '0', 10);
   let combo = 0;
   let comboTimer = null;
@@ -508,31 +522,31 @@
     }
   }
 
-  function renderSnake() {
-    if (isGhostMode) {
+  function drawSnakeBody(body, dir, palette, comboVal, ghost) {
+    if (ghost) {
       ctx.save();
       ctx.setLineDash([4, 4]);
     }
 
-    for (let i = 0; i < snake.length; i++) {
-      const seg = snake[i];
+    for (let i = 0; i < body.length; i++) {
+      const seg = body[i];
       const x = seg.x * cellSize;
       const y = seg.y * cellSize;
       const isHead = i === 0;
 
       if (isHead) {
-        // Head: Cobalt Blue or Golden Ghost Glow with sketch contour
-        const headFill = isGhostMode ? '#FACC15' : '#1D4ED8';
-        const headStroke = isGhostMode ? '#CA8A04' : '#1E3A8A';
+        // Head: player ink or ghost gold with sketch contour
+        const headFill = ghost ? '#FACC15' : palette.head;
+        const headStroke = ghost ? '#CA8A04' : palette.headStroke;
         drawSketchRect(x + 1, y + 1, cellSize - 2, cellSize - 2, headFill, headStroke);
         
         // Eyes based on direction
         const eyeOffset = cellSize * 0.3;
         let ex1 = x + eyeOffset, ey1 = y + eyeOffset;
         let ex2 = x + cellSize - eyeOffset, ey2 = y + eyeOffset;
-        if (direction === 'DOWN') { ey1 = y + cellSize - eyeOffset; ey2 = y + cellSize - eyeOffset; }
-        if (direction === 'LEFT') { ex1 = x + eyeOffset; ex2 = x + eyeOffset; ey2 = y + cellSize - eyeOffset; }
-        if (direction === 'RIGHT') { ex1 = x + cellSize - eyeOffset; ex2 = x + cellSize - eyeOffset; ey2 = y + cellSize - eyeOffset; }
+        if (dir === 'DOWN') { ey1 = y + cellSize - eyeOffset; ey2 = y + cellSize - eyeOffset; }
+        if (dir === 'LEFT') { ex1 = x + eyeOffset; ex2 = x + eyeOffset; ey2 = y + cellSize - eyeOffset; }
+        if (dir === 'RIGHT') { ex1 = x + cellSize - eyeOffset; ex2 = x + cellSize - eyeOffset; ey2 = y + cellSize - eyeOffset; }
 
         ctx.fillStyle = '#FFF';
         ctx.fillRect(ex1 - 2, ey1 - 2, 4, 4);
@@ -542,18 +556,18 @@
         ctx.fillRect(ex2 - 1, ey2 - 1, 2, 2);
 
         // Crown on combo streak or ghost sparkle
-        if (isGhostMode) {
+        if (ghost) {
           ctx.font = '12px sans-serif';
           ctx.fillText('✨', x + 2, y - 4);
-        } else if (combo >= 2) {
+        } else if (comboVal >= 2) {
           ctx.font = '12px sans-serif';
           ctx.fillText('👑', x + 2, y - 4);
         }
       } else {
-        // Body: Gradient sketch fill from Cobalt to Magenta, or Golden if ghost
-        const ratio = i / snake.length;
-        const color = isGhostMode ? (ratio > 0.5 ? '#FEF08A' : '#FDE047') : (ratio > 0.5 ? '#DB2777' : '#2563EB');
-        drawSketchRect(x + 2, y + 2, cellSize - 4, cellSize - 4, color, isGhostMode ? '#A16207' : '#2A2B32');
+        // Body: Gradient sketch fill from player near ink to far ink
+        const ratio = i / body.length;
+        const color = ghost ? (ratio > 0.5 ? '#FEF08A' : '#FDE047') : (ratio > 0.5 ? palette.bodyFar : palette.bodyNear);
+        drawSketchRect(x + 2, y + 2, cellSize - 4, cellSize - 4, color, ghost ? '#A16207' : '#2A2B32');
         
         // Cross-hatch sketch detail
         if (i % 2 === 0) {
@@ -562,23 +576,42 @@
       }
     }
 
-    if (isGhostMode) {
+    if (ghost) {
       ctx.restore();
     }
   }
 
+  function renderSnake() {
+    if (mode === 'vs') {
+      drawSnakeBody(snake, direction, PLAYERS.p1, 0, false);
+      drawSnakeBody(snake2, direction2, PLAYERS.p2, 0, false);
+    } else {
+      drawSnakeBody(snake, direction, PLAYERS.p1, combo, isGhostMode);
+    }
+  }
+
   // --- Game Mechanics ---
+  function cellOccupied(x, y) {
+    if (snake.some(seg => seg.x === x && seg.y === y)) return true;
+    if (mode === 'vs' && snake2.some(seg => seg.x === x && seg.y === y)) return true;
+    if (erasers.some(e => e.x === x && e.y === y)) return true;
+    return false;
+  }
+
   function spawnFood() {
     let valid = false;
     let newX, newY;
     let attempts = 0;
-    while (!valid && attempts < 100) {
+    const maxAttempts = mode === 'vs' ? 400 : 100;
+    while (!valid && attempts < maxAttempts) {
       attempts++;
       newX = Math.floor(Math.random() * GRID_SIZE);
       newY = Math.floor(Math.random() * GRID_SIZE);
-      const onSnake = snake.some(seg => seg.x === newX && seg.y === newY);
-      const onEraser = erasers.some(e => e.x === newX && e.y === newY);
-      valid = !onSnake && !onEraser;
+      valid = !cellOccupied(newX, newY);
+    }
+    if (!valid) {
+      food = null;
+      return;
     }
 
     // Pick munchkin type with weighted probability
@@ -686,6 +719,10 @@
 
   function update() {
     if (!isRunning || isPaused) return;
+    if (mode === 'vs') {
+      updateVs();
+      return;
+    }
 
     direction = nextDirection;
     const head = { ...snake[0] };
@@ -812,12 +849,244 @@
     draw();
   }
 
+  // --- VS Duel Mechanics ---
+  function stepHead(head, dir) {
+    const next = { x: head.x, y: head.y };
+    if (dir === 'UP') next.y -= 1;
+    else if (dir === 'DOWN') next.y += 1;
+    else if (dir === 'LEFT') next.x -= 1;
+    else if (dir === 'RIGHT') next.x += 1;
+    return next;
+  }
+
+  function hitsWall(cell) {
+    return cell.x < 0 || cell.x >= GRID_SIZE || cell.y < 0 || cell.y >= GRID_SIZE;
+  }
+
+  // Returns null if the move is safe, otherwise how this player died.
+  function crashCause(head, rivalBody) {
+    if (hitsWall(head)) return 'margin';
+    if (rivalBody.some(seg => seg.x === head.x && seg.y === head.y)) return 'rival';
+    if (cellOccupied(head.x, head.y)) return 'own';
+    return null;
+  }
+
+  function updateVs() {
+    direction = nextDirection;
+    direction2 = nextDirection2;
+
+    const head1 = stepHead(snake[0], direction);
+    const head2 = stepHead(snake2[0], direction2);
+
+    // Trails never shrink on their own in duel mode; every drawn segment is lethal.
+    let cause1 = crashCause(head1, snake2);
+    let cause2 = crashCause(head2, snake);
+
+    // Both heads onto the same cell, or heads swapping cells, is a mutual wipeout.
+    const sameCell = head1.x === head2.x && head1.y === head2.y;
+    const swapped = head1.x === snake2[0].x && head1.y === snake2[0].y &&
+                    head2.x === snake[0].x && head2.y === snake[0].y;
+    if (sameCell || swapped) {
+      cause1 = cause1 || 'headOn';
+      cause2 = cause2 || 'headOn';
+    }
+
+    if (cause1 || cause2) {
+      roundOver(cause1, cause2);
+      return;
+    }
+
+    snake.unshift(head1);
+    snake2.unshift(head2);
+    // No pop: the permanent trail is the weapon.
+
+    eatInVs(head1, snake, 'p1');
+    eatInVs(head2, snake2, 'p2');
+
+    draw();
+  }
+
+  function eatInVs(head, body, who) {
+    if (!food || head.x !== food.x || head.y !== food.y) return;
+
+    const points = food.type.points;
+    if (who === 'p1') score += points; else score2 += points;
+
+    spawnFloatingDoodle(head.x * cellSize, head.y * cellSize, `${who.toUpperCase()} +${points} eraser!`, food.type.color);
+    // Munchkins act as erasers in VS: rub out tail segments to reclaim space!
+    for (let i = 0; i < VS_ERASE_ON_EAT && body.length > 3; i++) body.pop();
+
+    triggerHaptic([30]);
+    playSound(food.type.name === 'coffee' ? 'coffee' : 'eat');
+    spawnFood();
+  }
+
+  function dirTowardCenter(cell) {
+    const c = (GRID_SIZE - 1) / 2;
+    const dx = c - cell.x;
+    const dy = c - cell.y;
+    if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? 'RIGHT' : 'LEFT';
+    return dy > 0 ? 'DOWN' : 'UP';
+  }
+
+  function spawnBodyAt(cell, dir) {
+    // Lay 3 starting segments behind head
+    const back = {
+      UP: { x: 0, y: 1 }, DOWN: { x: 0, y: -1 },
+      LEFT: { x: 1, y: 0 }, RIGHT: { x: -1, y: 0 }
+    }[dir];
+    const body = [];
+    for (let i = 0; i < 3; i++) body.push({ x: cell.x + back.x * i, y: cell.y + back.y * i });
+    return body;
+  }
+
+  function randomInnerCell() {
+    const span = GRID_SIZE - 6;
+    return {
+      x: 3 + Math.floor(Math.random() * span),
+      y: 3 + Math.floor(Math.random() * span)
+    };
+  }
+
+  function spawnVsPlayers() {
+    let a = randomInnerCell();
+    let b = randomInnerCell();
+    let guard = 0;
+    while (Math.abs(a.x - b.x) + Math.abs(a.y - b.y) < VS_MIN_SPAWN_GAP && guard < 300) {
+      b = randomInnerCell();
+      guard++;
+    }
+
+    direction = dirTowardCenter(a);
+    direction2 = dirTowardCenter(b);
+    nextDirection = direction;
+    nextDirection2 = direction2;
+    snake = spawnBodyAt(a, direction);
+    snake2 = spawnBodyAt(b, direction2);
+  }
+
+  function causeText(loser, cause) {
+    if (cause === 'margin') return `${loser} ran off the edge of the page.`;
+    if (cause === 'own') return `${loser} got tangled in their own trail.`;
+    if (cause === 'headOn') return `${loser} met their rival head-on.`;
+    return `${loser} slithered straight into the rival's trail.`;
+  }
+
+  function roundOver(cause1, cause2) {
+    isRunning = false;
+    clearInterval(gameInterval);
+    triggerHaptic([60, 50, 80]);
+    playSound('gameover');
+
+    let title, icon, msg;
+    if (cause1 && cause2) {
+      title = 'Double Smudge!';
+      icon = '💥🤝';
+      msg = 'Both snakes crashed on the same stroke — nobody scores this round.';
+    } else if (cause2) {
+      matchWins.p1++;
+      title = 'P1 Wins The Round! ✏️';
+      icon = '🏆✏️';
+      msg = causeText('P2', cause2);
+    } else {
+      matchWins.p2++;
+      title = 'P2 Wins The Round! ⚔️';
+      icon = '🏆⚔️';
+      msg = causeText('P1', cause1);
+    }
+    msg += ` Munchkins — P1: ${score} · P2: ${score2}. Match: ${matchWins.p1}–${matchWins.p2}.`;
+
+    updateScoreUI();
+    const overlay = document.getElementById('game-overlay');
+    document.getElementById('overlay-title').textContent = title;
+    document.getElementById('overlay-msg').textContent = msg;
+    document.getElementById('overlay-icon').textContent = icon;
+    document.getElementById('start-btn').textContent = 'NEXT ROUND ⚔️';
+    overlay.classList.remove('hidden');
+  }
+
+  function setMode(newMode) {
+    if (mode === newMode) return;
+    mode = newMode;
+    isRunning = false;
+    isPaused = false;
+    clearInterval(gameInterval);
+    clearInterval(ghostTimer);
+    clearTimeout(comboTimer);
+    hideComboBadge();
+    combo = 0;
+    particles = [];
+    inkProjectiles = [];
+    erasers = [];
+    food = null;
+    snake = [];
+    snake2 = [];
+    score = 0;
+    score2 = 0;
+    matchWins = { p1: 0, p2: 0 };
+    applyModeUI();
+    draw();
+  }
+
+  function applyModeUI() {
+    const isVs = mode === 'vs';
+    document.body.classList.toggle('mode-vs', isVs);
+    const scoreLabel = document.getElementById('score-label');
+    const bestLabel = document.getElementById('best-label');
+    if (scoreLabel) scoreLabel.textContent = isVs ? 'P1 ✏️' : 'SCORE';
+    if (bestLabel) bestLabel.textContent = isVs ? 'P2 ⚔️' : 'BEST';
+
+    const soloBtn = document.getElementById('mode-solo-btn');
+    const vsBtn = document.getElementById('mode-vs-btn');
+    if (soloBtn) soloBtn.classList.toggle('active', !isVs);
+    if (vsBtn) vsBtn.classList.toggle('active', isVs);
+
+    const overlay = document.getElementById('game-overlay');
+    document.getElementById('overlay-title').textContent = isVs ? 'Tron Duel! ⚔️' : 'Ready to Sketch?';
+    document.getElementById('overlay-msg').innerHTML = isVs
+      ? 'Two snakes, random spawns, permanent pencil trails. Box your rival in! Munchkins act as erasers.<br><strong>P1:</strong> WASD or D-pad · <strong>P2:</strong> Arrow keys or swipe.'
+      : 'Swipe or arrows to slither. <strong>[SPACE]</strong> or <strong>✏️ INK</strong> shoots lead! Beware rogue erasers 🧼 & grab highlighters for ghost immunity ✨';
+    document.getElementById('overlay-icon').textContent = isVs ? '✏️⚔️🐍' : '🐱💤';
+    document.getElementById('start-btn').textContent = isVs ? 'START DUEL ⚔️' : 'START SLITHERING ✏️';
+    overlay.classList.remove('hidden');
+    updateScoreUI();
+    updateInkButtonState();
+  }
+
+  function startRound() {
+    if (mode === 'vs') startVsGame();
+    else startGame();
+  }
+
+  function startVsGame() {
+    initAudio();
+    spawnVsPlayers();
+    score = 0;
+    score2 = 0;
+    combo = 0;
+    particles = [];
+    inkProjectiles = [];
+    erasers = [];
+    hideComboBadge();
+    updateScoreUI();
+
+    spawnFood();
+    isRunning = true;
+    isPaused = false;
+
+    document.getElementById('game-overlay').classList.add('hidden');
+    clearInterval(gameInterval);
+    gameInterval = setInterval(update, VS_SPEED_MS);
+  }
+
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     renderGrid();
     renderFood();
-    renderErasers();
-    renderProjectiles();
+    if (mode === 'solo') {
+      renderErasers();
+      renderProjectiles();
+    }
     renderSnake();
     updateAndDrawParticles();
   }
@@ -850,6 +1119,11 @@
   }
 
   function updateScoreUI() {
+    if (mode === 'vs') {
+      document.getElementById('score-val').textContent = matchWins.p1;
+      document.getElementById('best-val').textContent = matchWins.p2;
+      return;
+    }
     document.getElementById('score-val').textContent = score;
     if (score > bestScore) {
       bestScore = score;
@@ -919,31 +1193,41 @@
   }
 
   // --- Controls & Event Listeners ---
-  function handleDirection(newDir) {
+  function isReverse(newDir, curDir) {
+    return (newDir === 'UP' && curDir === 'DOWN') ||
+           (newDir === 'DOWN' && curDir === 'UP') ||
+           (newDir === 'LEFT' && curDir === 'RIGHT') ||
+           (newDir === 'RIGHT' && curDir === 'LEFT');
+  }
+
+  function handleDirection(newDir, player = 'p1') {
     initAudio();
-    if (
-      (newDir === 'UP' && direction !== 'DOWN') ||
-      (newDir === 'DOWN' && direction !== 'UP') ||
-      (newDir === 'LEFT' && direction !== 'RIGHT') ||
-      (newDir === 'RIGHT' && direction !== 'LEFT')
-    ) {
-      nextDirection = newDir;
-    }
+    // Outside a duel every input drives player one
+    const who = (mode === 'vs' && player === 'p2') ? 'p2' : 'p1';
+    const curDir = who === 'p2' ? direction2 : direction;
+    if (isReverse(newDir, curDir)) return;
+    if (who === 'p2') nextDirection2 = newDir;
+    else nextDirection = newDir;
   }
 
   function setupControls() {
     // Keyboard
     window.addEventListener('keydown', (e) => {
-      if (['ArrowUp', 'KeyW'].includes(e.code)) { e.preventDefault(); handleDirection('UP'); }
-      else if (['ArrowDown', 'KeyS'].includes(e.code)) { e.preventDefault(); handleDirection('DOWN'); }
-      else if (['ArrowLeft', 'KeyA'].includes(e.code)) { e.preventDefault(); handleDirection('LEFT'); }
-      else if (['ArrowRight', 'KeyD'].includes(e.code)) { e.preventDefault(); handleDirection('RIGHT'); }
+      // In a duel, arrows belong to P2 and WASD to P1; in solo both steer the one snake.
+      if (e.code === 'KeyW') { e.preventDefault(); handleDirection('UP', 'p1'); }
+      else if (e.code === 'KeyS') { e.preventDefault(); handleDirection('DOWN', 'p1'); }
+      else if (e.code === 'KeyA') { e.preventDefault(); handleDirection('LEFT', 'p1'); }
+      else if (e.code === 'KeyD') { e.preventDefault(); handleDirection('RIGHT', 'p1'); }
+      else if (e.code === 'ArrowUp') { e.preventDefault(); handleDirection('UP', mode === 'vs' ? 'p2' : 'p1'); }
+      else if (e.code === 'ArrowDown') { e.preventDefault(); handleDirection('DOWN', mode === 'vs' ? 'p2' : 'p1'); }
+      else if (e.code === 'ArrowLeft') { e.preventDefault(); handleDirection('LEFT', mode === 'vs' ? 'p2' : 'p1'); }
+      else if (e.code === 'ArrowRight') { e.preventDefault(); handleDirection('RIGHT', mode === 'vs' ? 'p2' : 'p1'); }
       else if (e.code === 'Space') {
         e.preventDefault();
         if (!isRunning) {
-          startGame();
+          startRound();
           if (!isMusicPlaying) toggleMusic(true);
-        } else if (!isPaused) {
+        } else if (!isPaused && mode === 'solo') {
           shootInk();
         }
       } else if (e.code === 'KeyP' || e.code === 'Escape') {
@@ -952,26 +1236,26 @@
       }
     });
 
-    // Ink Shot Button
+    // Ink Shot Button (Solo only)
     const inkBtn = document.getElementById('ink-btn');
     if (inkBtn) {
       inkBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        shootInk();
+        if (mode === 'solo') shootInk();
       });
     }
 
-    // Touch D-Pad buttons
+    // Touch D-Pad buttons (steers P1 in both Solo and VS Duel)
     document.querySelectorAll('.dpad-btn').forEach(btn => {
       btn.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         const dir = btn.getAttribute('data-dir');
-        handleDirection(dir);
+        handleDirection(dir, 'p1');
         triggerHaptic([15]);
       });
     });
 
-    // Swipe Gestures on Canvas
+    // Swipe Gestures on Canvas (steers P2 in VS Duel, P1 in Solo)
     let touchStartX = 0;
     let touchStartY = 0;
     const canvasWrap = document.getElementById('canvas-wrap');
@@ -990,13 +1274,47 @@
       const absDy = Math.abs(dy);
 
       if (Math.max(absDx, absDy) > 25) {
+        const pTag = mode === 'vs' ? 'p2' : 'p1';
         if (absDx > absDy) {
-          handleDirection(dx > 0 ? 'RIGHT' : 'LEFT');
+          handleDirection(dx > 0 ? 'RIGHT' : 'LEFT', pTag);
         } else {
-          handleDirection(dy > 0 ? 'DOWN' : 'UP');
+          handleDirection(dy > 0 ? 'DOWN' : 'UP', pTag);
         }
       }
     }, { passive: true });
+
+    // Mode Selector Buttons
+    const soloBtn = document.getElementById('mode-solo-btn');
+    if (soloBtn) {
+      soloBtn.addEventListener('click', () => setMode('solo'));
+    }
+    const vsBtn = document.getElementById('mode-vs-btn');
+    if (vsBtn) {
+      vsBtn.addEventListener('click', () => setMode('vs'));
+    }
+
+    // Credits Modal Trigger and Close
+    const creditsBtn = document.getElementById('credits-btn');
+    const creditsModal = document.getElementById('credits-modal');
+    const closeCreditsBtn = document.getElementById('close-credits-btn');
+    if (creditsBtn && creditsModal) {
+      creditsBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        creditsModal.classList.remove('hidden');
+      });
+    }
+    if (closeCreditsBtn && creditsModal) {
+      closeCreditsBtn.addEventListener('click', () => {
+        creditsModal.classList.add('hidden');
+      });
+    }
+    if (creditsModal) {
+      creditsModal.addEventListener('click', (e) => {
+        if (e.target === creditsModal) {
+          creditsModal.classList.add('hidden');
+        }
+      });
+    }
 
     // Music Controls
     const musicPlayBtn = document.getElementById('music-play-btn');
@@ -1014,7 +1332,7 @@
 
     // Buttons
     document.getElementById('start-btn').addEventListener('click', () => {
-      startGame();
+      startRound();
       if (!isMusicPlaying) toggleMusic(true);
     });
     document.getElementById('pause-btn').addEventListener('click', togglePause);
@@ -1046,6 +1364,7 @@
 
     window.addEventListener('resize', resizeCanvas);
     setupControls();
+    applyModeUI();
     updateMusicUI();
     resizeCanvas();
     draw();

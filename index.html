@@ -46,11 +46,11 @@
       <div class="score-area">
         <div class="score-board">
           <div class="score-card current">
-            <span class="label">SCORE</span>
+            <span id="score-label" class="label">SCORE</span>
             <span id="score-val" class="value">0</span>
           </div>
           <div class="score-card best">
-            <span class="label">BEST</span>
+            <span id="best-label" class="label">BEST</span>
             <span id="best-val" class="value">0</span>
           </div>
         </div>
@@ -72,9 +72,43 @@
         <div class="overlay-content">
           <div class="doodle-cat" id="overlay-icon">🐱💤</div>
           <h2 id="overlay-title">Ready to Sketch?</h2>
+
+          <div class="mode-selector-wrap">
+            <button id="mode-solo-btn" class="mode-pill-btn active" data-mode="solo">🐍 Solo Mode</button>
+            <button id="mode-vs-btn" class="mode-pill-btn" data-mode="vs">⚔️ Tron Duel (2P)</button>
+          </div>
+
           <p id="overlay-msg">Swipe or arrows to slither. <strong>[SPACE]</strong> or <strong>✏️ INK</strong> shoots lead! Beware rogue erasers 🧼 & grab highlighters for ghost immunity ✨</p>
           <div class="mantra-quote">"progress not perfection · duality is architecture 🧡"</div>
           <button id="start-btn" class="sketch-btn primary-btn">START SLITHERING ✏️</button>
+          <div class="overlay-aux-row">
+            <button id="credits-btn" class="text-link-btn">📜 Credits & Shout-outs</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Community Credits Modal -->
+    <div id="credits-modal" class="credits-modal hidden">
+      <div class="credits-box">
+        <div class="credits-header">
+          <h3>Sketchy Snake Credits ✏️</h3>
+          <button id="close-credits-btn" class="close-credits-btn" aria-label="Close">&times;</button>
+        </div>
+        <div class="credits-body">
+          <div class="credit-entry">
+            <strong>🎨 Creator & Maintainer:</strong>
+            <p>@aunysillyme</p>
+          </div>
+          <div class="credit-entry">
+            <strong>⚔️ Tron Duel & Multiplayer Architecture:</strong>
+            <p>@NFTaanon / @cortexresearch — Built the local Tron permanent trail battle & WebSocket server engine.</p>
+          </div>
+          <div class="credit-entry">
+            <strong>✨ Gameplay Mechanics & HUD Feedback:</strong>
+            <p>@someguy_112358 & @Soorena — Proposed the Ink Shot clutch survival mechanic, Rogue Erasers, and side HUD layout.</p>
+          </div>
+          <p class="credits-note">Built with HTML5 Canvas, Web Audio API, and Capacitor. 100% Free & Open Source 🧡</p>
         </div>
       </div>
     </div>

@@ -60,27 +60,48 @@ The game features an embedded, zero-dependency **Web Audio API synthesizer & seq
 
 ---
 
-## 🕹️ Controls
+---
 
-| Platform | Control Scheme | Action |
-|---|---|---|
-| **Mobile / Touch** | Swipe Gestures | Slither in any direction |
-| **Mobile / Touch** | On-screen D-Pad | Steer with tactile feedback |
-| **Mobile / Touch** | `✏️ INK` Button | Shoot lead / shed 1 tail segment for clutch escape |
-| **Desktop / Keyboard** | `Arrow Keys` / `WASD` | Steer snake |
-| **Desktop / Keyboard** | `Spacebar` | Shoot Ink / Shed Tail (when running) or Start game |
-| **Desktop / Keyboard** | `P` / `Escape` | Pause / Resume |
-| **Android** | Hardware Haptics | Micro-vibrations on bites, shots & combos (`navigator.vibrate`) |
+## 🕹️ Game Modes & Controls
+
+### 1. 🐍 Classic Solo Mode
+Slither across the graph paper, gobble munchkins, and build combo streaks!
+* **Ink Shot / Shed Tail:** Press `[SPACE]` (desktop) or tap `✏️ INK` (mobile). When your snake has 4+ segments, you sacrifice 1 tail segment to shoot pencil lead forward to snipe erasers or escape tight traps.
+* **Rogue Erasers 🧼:** Spawns after score 15. Erases 2 segments on contact, or sniped with ink shot for +40 bonus points.
+* **Ghost Sketch Immunity ✨:** Pick up the glowing highlighter for 4s of immunity (pass through your own body).
+* **Controls:** `WASD`, `Arrow Keys`, on-screen D-Pad, or Canvas Swipes.
+
+### 2. ⚔️ Tron Duel Mode (2-Player Local)
+A competitive two-player battle on the same device!
+* **Permanent Trails:** Tails never shrink on their own — your drawn graphite line becomes a lethal wall your opponent must avoid.
+* **Munchkin Erasers:** Eating munchkins in VS mode rubs out 5 tail segments, the only way to reclaim board space.
+* **Double Smudge:** Simultaneous crashes are scored as an honorable draw.
+* **Controls:**
+  * **Player 1 (Cobalt Blue):** `W` `A` `S` `D` keys or on-screen D-Pad.
+  * **Player 2 (Magenta Pink):** `Arrow Keys` or Canvas Swipe.
+
+### 3. 🌐 Online Multiplayer Architecture (`server/`)
+Includes an authoritative Node.js WebSocket server supporting room codes, matchmaking, spectators, and seat tokens.
+To run the multiplayer server locally:
+```bash
+cd server
+npm install
+npm start
+# Server listens on http://localhost:3000 (WebSocket & Static Files)
+```
 
 ---
 
-## 🌟 Community Shout-Outs & Player Feedback
+## 🌟 Community Shout-Outs & Contributor Credits
 
-Big love to the community for testing early builds and giving game-changing feedback! 🧡
+Big love to the community for contributing code, testing early builds, and giving game-changing feedback! 🧡
+
+* **[@NFTaanon](https://github.com/cortexresearch)** / **[cortexresearch](https://github.com/cortexresearch/sketchy-snake)**:
+  * **Contribution:** Designed and implemented the **Tron-style 2-Player Duel mode** (permanent trails, simultaneous crash detection, and eraser munchkins) and built the authoritative **WebSocket multiplayer server architecture** (`server/` + `net.js`).
 
 * **[@someguy_112358](https://x.com/someguy_112358)**:
   > *"It's nice but maybe missing something besides the cool graphics to diferenciate it from other snakes. What if you added some powers, like shoting a part of itself or a immunity frame and some enemies or obstacles or something like that?"*
-  * **Resulting Mechanics:** Inspired the **Ink Shot / Shed Tail** clutch mechanic (sacrifice a tail segment to shoot pencil lead forward!), the **Rogue Eraser 🧼** hazard, and the **Ghost Sketch 🖍️** immunity power-up.
+  * **Resulting Mechanics:** Inspired the **Ink Shot / Shed Tail** clutch survival mechanic, the **Rogue Eraser 🧼** hazard, and the **Ghost Sketch 🖍️** immunity power-up.
 
 * **[@Soorena](https://x.com/Soorena)**:
   > *"the combo pop up blocks the items sometimes. maybe place the combo pop up outside of the game's frame?"*
