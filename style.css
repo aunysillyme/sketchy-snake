@@ -757,6 +757,15 @@ body.mode-vs .score-card.best.active-turn {
   display: none !important;
 }
 
+.online-controls.hidden { display: none; }
+.online-controls { margin: 12px auto; max-width: 330px; }
+.online-actions, .join-room-row { display: flex; gap: 8px; justify-content: center; margin: 8px 0; }
+.join-room-row input {
+  width: 130px; padding: 8px; border: 2px solid var(--pencil-charcoal);
+  border-radius: 8px; font: 700 1rem 'Patrick Hand', cursive; text-transform: uppercase;
+}
+#online-status { margin: 6px 0; font-size: .95rem; }
+
 .credits-box {
   background: var(--paper-bg);
   border: 3px solid var(--pencil-charcoal);

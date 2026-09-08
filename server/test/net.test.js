@@ -9,7 +9,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const WebSocket = require('ws');
 
-const { server, wss } = require('../index');
+const { server, wss, manager } = require('../index');
 
 let baseUrl;
 
@@ -175,6 +175,33 @@ test('a player who never comes back forfeits the round', async () => {
   assert.strictEqual(result.causes.p2, 'forfeit');
   assert.strictEqual(result.wins.p1, 1);
 
+  a.close();
+});
+
+test('two dropped players both release their seats after grace', async () => {
+  const a = await connect();
+  const b = await connect();
+  a.sendMsg({ t: 'create' });
+  const joined = await a.waitFor('joined');
+  b.sendMsg({ t: 'join', room: joined.room });
+  await b.waitFor('joined');
+  await a.waitFor('state');
+  a.close();
+  b.close();
+  await new Promise(resolve => setTimeout(resolve, 900));
+  const room = manager.get(joined.room);
+  assert.strictEqual(room.seats.p1, null);
+  assert.strictEqual(room.seats.p2, null);
+  assert.strictEqual(room.phase, 'waiting');
+});
+
+test('an explicit leave releases the seat immediately', async () => {
+  const a = await connect();
+  a.sendMsg({ t: 'create' });
+  const joined = await a.waitFor('joined');
+  a.sendMsg({ t: 'leave' });
+  await a.waitFor('left');
+  assert.strictEqual(manager.get(joined.room).seats.p1, null);
   a.close();
 });
 

@@ -1,4 +1,4 @@
-package com.aunysillyme.sketchysnake;
+package com.aunysillydev.sketchysnake;
 
 import com.getcapacitor.BridgeActivity;
 

@@ -41,7 +41,7 @@
   // --- State Variables ---
   let canvas, ctx;
   let cellSize = 20;
-  let mode = 'solo'; // 'solo' | 'vs'
+  let mode = 'solo'; // 'solo' | 'vs' | 'online'
   let snake = [];
   let direction = 'RIGHT';
   let nextDirection = 'RIGHT';
@@ -49,6 +49,8 @@
   let direction2 = 'LEFT';
   let nextDirection2 = 'LEFT';
   let currentTurn = 'p1'; // 'p1' | 'p2' (alternating turns in vs mode)
+  let onlineSeat = null;
+  let onlineRoom = null;
   let food = null;
   let score = 0;
   let score2 = 0;
@@ -583,10 +585,10 @@
   }
 
   function renderSnake() {
-    if (mode === 'vs') {
+    if (mode === 'vs' || mode === 'online') {
       drawSnakeBody(snake, direction, PLAYERS.p1, 0, false);
       drawSnakeBody(snake2, direction2, PLAYERS.p2, 0, false);
-      if (isRunning) {
+      if (isRunning && mode === 'vs') {
         ctx.save();
         ctx.font = `${Math.max(12, cellSize * 0.75)}px sans-serif`;
         ctx.textAlign = 'center';
@@ -605,7 +607,7 @@
   // --- Game Mechanics ---
   function cellOccupied(x, y) {
     if (snake.some(seg => seg.x === x && seg.y === y)) return true;
-    if (mode === 'vs' && snake2.some(seg => seg.x === x && seg.y === y)) return true;
+    if ((mode === 'vs' || mode === 'online') && snake2.some(seg => seg.x === x && seg.y === y)) return true;
     if (erasers.some(e => e.x === x && e.y === y)) return true;
     return false;
   }
@@ -682,8 +684,8 @@
     else if (direction === 'RIGHT') dx = 1;
 
     inkProjectiles.push({
-      x: head.x + dx,
-      y: head.y + dy,
+      x: head.x,
+      y: head.y,
       dx, dy,
       life: 14
     });
@@ -731,7 +733,7 @@
 
   function update() {
     if (!isRunning || isPaused) return;
-    if (mode === 'vs') return;
+    if (mode === 'vs' || mode === 'online') return;
 
     direction = nextDirection;
     const head = { ...snake[0] };
@@ -744,9 +746,7 @@
     // 1. Move Ink Projectiles & Check Hits
     for (let i = inkProjectiles.length - 1; i >= 0; i--) {
       const p = inkProjectiles[i];
-      p.x += p.dx;
-      p.y += p.dy;
-      p.life--;
+      window.SketchyRules.advanceProjectile(p);
 
       if (p.x < 0 || p.x >= GRID_SIZE || p.y < 0 || p.y >= GRID_SIZE || p.life <= 0) {
         inkProjectiles.splice(i, 1);
@@ -791,7 +791,8 @@
     }
 
     // 4. Self Collision Check (Bypassed if Ghost Mode!)
-    if (!isGhostMode && snake.some(seg => seg.x === head.x && seg.y === head.y)) {
+    const willGrow = food && head.x === food.x && head.y === food.y;
+    if (!isGhostMode && window.SketchyRules.wouldHitSelf(snake, head, willGrow)) {
       gameOver('Tangled up in your own sketch!');
       return;
     }
@@ -1024,6 +1025,7 @@
 
   function setMode(newMode) {
     if (mode === newMode) return;
+    const previousMode = mode;
     mode = newMode;
     isRunning = false;
     isPaused = false;
@@ -1041,6 +1043,7 @@
     score = 0;
     score2 = 0;
     matchWins = { p1: 0, p2: 0 };
+    if (previousMode === 'online' && newMode !== 'online' && window.SketchyNet) window.SketchyNet.leave();
     if (newMode === 'solo') {
       bestScore = parseInt(localStorage.getItem('sketchy_snake_best') || '0', 10);
     }
@@ -1049,7 +1052,7 @@
   }
 
   function applyModeUI() {
-    const isVs = mode === 'vs';
+    const isVs = mode === 'vs' || mode === 'online';
     document.body.classList.toggle('mode-vs', isVs);
     const scoreLabel = document.getElementById('score-label');
     const bestLabel = document.getElementById('best-label');
@@ -1058,16 +1061,22 @@
 
     const soloBtn = document.getElementById('mode-solo-btn');
     const vsBtn = document.getElementById('mode-vs-btn');
+    const onlineBtn = document.getElementById('mode-online-btn');
     if (soloBtn) soloBtn.classList.toggle('active', !isVs);
     if (vsBtn) vsBtn.classList.toggle('active', isVs);
+    if (vsBtn) vsBtn.classList.toggle('active', mode === 'vs');
+    if (onlineBtn) onlineBtn.classList.toggle('active', mode === 'online');
+    document.getElementById('online-controls').classList.toggle('hidden', mode !== 'online');
 
     const overlay = document.getElementById('game-overlay');
-    document.getElementById('overlay-title').textContent = isVs ? 'Tron Duel! ⚔️' : 'Ready to Sketch?';
-    document.getElementById('overlay-msg').innerHTML = isVs
+    document.getElementById('overlay-title').textContent = mode === 'online' ? 'Online Tron Duel! 🌐' : (isVs ? 'Tron Duel! ⚔️' : 'Ready to Sketch?');
+    document.getElementById('overlay-msg').innerHTML = mode === 'online'
+      ? 'Create a private room, enter a friend’s code, or find a quick match. The server runs the shared board.'
+      : isVs
       ? 'Pass & Play: Take turns stepping 1 cell! Every step leaves a permanent pencil line. Box your rival in!<br>Munchkins act as erasers to shave your tail.<br><strong>Controls:</strong> Share the D-pad, swipe, or arrows on each turn.'
       : 'Swipe or arrows to slither. <strong>[SPACE]</strong> or <strong>✏️ INK</strong> shoots lead! Beware rogue erasers 🧼 & grab highlighters for ghost immunity ✨';
     document.getElementById('overlay-icon').textContent = isVs ? '✏️⚔️🐍' : '🐱💤';
-    document.getElementById('start-btn').textContent = isVs ? 'START DUEL ⚔️' : 'START SLITHERING ✏️';
+    document.getElementById('start-btn').textContent = mode === 'online' ? 'QUICK MATCH 🌐' : (isVs ? 'START DUEL ⚔️' : 'START SLITHERING ✏️');
     overlay.classList.remove('hidden');
     if (mode === 'solo') {
       bestScore = parseInt(localStorage.getItem('sketchy_snake_best') || '0', 10);
@@ -1078,7 +1087,8 @@
   }
 
   function startRound() {
-    if (mode === 'vs') startVsGame();
+    if (mode === 'online') window.SketchyNet.quickMatch();
+    else if (mode === 'vs') startVsGame();
     else startGame();
   }
 
@@ -1144,7 +1154,7 @@
   }
 
   function updateScoreUI() {
-    if (mode === 'vs') {
+    if (mode === 'vs' || mode === 'online') {
       document.getElementById('score-val').textContent = matchWins.p1;
       document.getElementById('best-val').textContent = matchWins.p2;
       return;
@@ -1260,6 +1270,10 @@
 
   function handleDirection(newDir) {
     initAudio();
+    if (mode === 'online') {
+      if (onlineSeat === 'p1' || onlineSeat === 'p2') window.SketchyNet.sendDir(newDir);
+      return;
+    }
     if (mode === 'vs') {
       stepDuelTurn(newDir);
       return;
@@ -1344,6 +1358,12 @@
     if (vsBtn) {
       vsBtn.addEventListener('click', () => setMode('vs'));
     }
+    document.getElementById('mode-online-btn').addEventListener('click', () => setMode('online'));
+    document.getElementById('quick-match-btn').addEventListener('click', () => window.SketchyNet.quickMatch());
+    document.getElementById('create-room-btn').addEventListener('click', () => window.SketchyNet.createRoom());
+    document.getElementById('join-room-btn').addEventListener('click', () => {
+      window.SketchyNet.joinRoom(document.getElementById('room-code-input').value);
+    });
 
     // Credits Modal Trigger and Close
     const creditsBtn = document.getElementById('credits-btn');
@@ -1412,6 +1432,7 @@
   function init() {
     canvas = document.getElementById('game-canvas');
     ctx = canvas.getContext('2d');
+    setupOnline();
     document.getElementById('best-val').textContent = bestScore;
 
     window.addEventListener('resize', resizeCanvas);
@@ -1420,6 +1441,56 @@
     updateMusicUI();
     resizeCanvas();
     draw();
+  }
+
+  function setupOnline() {
+    const status = document.getElementById('online-status');
+    if (!window.SketchyNet) {
+      status.textContent = 'Online play is unavailable in this build.';
+      return;
+    }
+    window.SketchyNet
+      .on('status', event => { status.textContent = event.detail ? `${event.status}: ${event.detail}` : event.status; })
+      .on('joined', msg => {
+        onlineSeat = msg.seat;
+        onlineRoom = msg.room;
+        matchWins = msg.wins || matchWins;
+        status.textContent = `${msg.seat === 'spectator' ? 'Watching' : `Playing as ${msg.seat.toUpperCase()}`} · room ${msg.room}`;
+      })
+      .on('state', msg => {
+        if (mode !== 'online') return;
+        snake = msg.p1.cells.map(cell => ({ x: cell % GRID_SIZE, y: Math.floor(cell / GRID_SIZE) }));
+        snake2 = msg.p2.cells.map(cell => ({ x: cell % GRID_SIZE, y: Math.floor(cell / GRID_SIZE) }));
+        direction = msg.p1.dir;
+        direction2 = msg.p2.dir;
+        score = msg.p1.score;
+        score2 = msg.p2.score;
+        const type = msg.food && MUNCHKIN_TYPES.find(item => item.name === msg.food.type);
+        food = msg.food ? { x: msg.food.at % GRID_SIZE, y: Math.floor(msg.food.at / GRID_SIZE), type: type || MUNCHKIN_TYPES[0] } : null;
+        isRunning = true;
+        isPaused = false;
+        document.getElementById('game-overlay').classList.add('hidden');
+        updateScoreUI();
+        draw();
+      })
+      .on('paused', msg => {
+        isPaused = true;
+        status.textContent = `${msg.seat.toUpperCase()} disconnected; waiting ${msg.seconds}s.`;
+        document.getElementById('overlay-title').textContent = 'Match paused';
+        document.getElementById('overlay-msg').textContent = 'Waiting for the other player to reconnect.';
+        document.getElementById('game-overlay').classList.remove('hidden');
+      })
+      .on('roundover', msg => {
+        isRunning = false;
+        matchWins = msg.wins || matchWins;
+        const winner = msg.winner ? `${msg.winner.toUpperCase()} wins` : 'Draw';
+        document.getElementById('overlay-title').textContent = winner;
+        document.getElementById('overlay-msg').textContent = msg.forfeit ? 'The other player disconnected.' : 'Round complete.';
+        document.getElementById('start-btn').textContent = 'FIND ANOTHER MATCH 🌐';
+        document.getElementById('game-overlay').classList.remove('hidden');
+        updateScoreUI();
+      })
+      .on('error', msg => { status.textContent = msg.message || 'Could not join that match.'; });
   }
 
   window.addEventListener('DOMContentLoaded', init);

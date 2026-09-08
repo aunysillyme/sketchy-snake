@@ -62,6 +62,20 @@ test('bad URL encodings and decoded NUL return 400 without killing HTTP', async 
   assert.equal((await request('/does-not-exist.txt')).status, 404);
 });
 
+test('static serving exposes only explicit public game assets', async () => {
+  for (const path of [
+    '/package.json', '/server/index.js', '/android/app/build.gradle', '/.git/config',
+    '/../sketchy-snake-secret.txt', '/%2e%2e/sketchy-snake-secret.txt',
+    '/server/../package.json'
+  ]) {
+    assert.equal((await request(path)).status, 404, path);
+  }
+  assert.equal((await request('/game.js')).status, 200);
+  assert.equal((await request('/game-rules.js')).status, 200);
+  assert.equal((await request('/net.js')).status, 200);
+  assert.equal((await request('/privacy.html')).status, 200);
+});
+
 test('invalid JSON fields are rejected before room allocation or detachment', async t => {
   const socket = await connect(t);
   socket.sendMsg({ t: 'create', name: 'Player ✏️' });

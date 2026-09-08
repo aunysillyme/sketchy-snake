@@ -23,6 +23,13 @@ const { validMessage, MAX_PAYLOAD_BYTES } = require('./protocol');
 
 const PORT = process.env.PORT || 8787;
 const STATIC_ROOT = path.resolve(__dirname, '..');
+const PUBLIC_FILES = new Map([
+  ['/', 'index.html'], ['/index.html', 'index.html'], ['/style.css', 'style.css'],
+  ['/game.js', 'game.js'], ['/game-rules.js', 'game-rules.js'], ['/net.js', 'net.js'], ['/manifest.json', 'manifest.json'],
+  ['/favicon.svg', 'favicon.svg'], ['/favicon.png', 'favicon.png'],
+  ['/apple-touch-icon.png', 'apple-touch-icon.png'], ['/og-thumbnail.jpg', 'og-thumbnail.jpg'],
+  ['/privacy.html', 'privacy.html']
+]);
 const HEARTBEAT_MS = 30000;
 
 const MIME = {
@@ -49,14 +56,12 @@ function serveStatic(req, res) {
     res.writeHead(400, { 'Content-Type': 'text/plain' }).end('Bad request');
     return;
   }
-  if (rel === '/') rel = '/index.html';
-
-  const filePath = path.join(STATIC_ROOT, rel);
-  // Never serve outside the project, whatever the request says.
-  if (!filePath.startsWith(STATIC_ROOT)) {
-    res.writeHead(403).end('Forbidden');
+  const publicFile = PUBLIC_FILES.get(rel);
+  if (!publicFile) {
+    res.writeHead(404, { 'Content-Type': 'text/plain' }).end('Not found');
     return;
   }
+  const filePath = path.join(STATIC_ROOT, publicFile);
 
   fs.readFile(filePath, (err, data) => {
     if (err) {
@@ -124,9 +129,9 @@ function seatInto(socket, room, payload) {
 }
 
 /** Take a socket out of whatever room it is in, without killing the socket. */
-function detach(socket) {
+function detach(socket, reconnect = false) {
   if (socket.room) {
-    socket.room.leave(socket);
+    socket.room.leave(socket, { reconnect });
     socket.room = null;
     socket.seat = null;
   }
@@ -222,6 +227,7 @@ const heartbeat = setInterval(() => {
     try { socket.ping(); } catch (e) {}
   }
 }, HEARTBEAT_MS);
+if (heartbeat.unref) heartbeat.unref();
 
 wss.on('close', () => clearInterval(heartbeat));
 

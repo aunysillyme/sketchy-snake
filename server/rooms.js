@@ -36,7 +36,7 @@ class Room {
     this.phase = 'waiting';
     this.tickTimer = null;
     this.phaseTimer = null;
-    this.graceTimer = null;
+    this.graceTimers = { p1: null, p2: null };
     this.emptySince = Date.now();
   }
 
@@ -71,7 +71,7 @@ class Room {
       if (name) seat.name = name;
       socket.seat = existing;
       socket.room = this;
-      this.clearGrace();
+      this.clearGrace(existing);
       this.broadcastPeers('reconnect', existing);
       this.resumeAfterReconnect();
       return { seat: existing, token: seat.token };
@@ -101,7 +101,7 @@ class Room {
     return { seat: 'spectator', token: null };
   }
 
-  leave(socket) {
+  leave(socket, { reconnect = true } = {}) {
     if (this.spectators.delete(socket)) {
       this.broadcastPeers('leave', 'spectator');
       this.checkEmpty();
@@ -111,11 +111,27 @@ class Room {
     const seat = socket.seat;
     if (!seat || !this.seats[seat] || this.seats[seat].socket !== socket) return;
 
+    if (!reconnect) {
+      this.clearGrace(seat);
+      this.seats[seat].connected = false;
+      this.seats[seat].socket = null;
+      if (this.phase === 'playing' || this.phase === 'countdown' || this.phase === 'paused') {
+        this.phase = 'paused';
+        this.finishForfeit(seat);
+      } else {
+        this.seats[seat] = null;
+        this.broadcastPeers('leave', seat);
+        this.checkEmpty();
+        this.maybeStart();
+      }
+      return;
+    }
+
     this.seats[seat].connected = false;
     this.seats[seat].socket = null;
     this.broadcastPeers('leave', seat);
 
-    if (this.phase === 'playing' || this.phase === 'countdown') {
+    if (this.phase === 'playing' || this.phase === 'countdown' || this.phase === 'paused') {
       // Hold the round open — they may be reconnecting rather than quitting.
       this.pauseForReconnect(seat);
     } else {
@@ -136,38 +152,36 @@ class Room {
   // --- Reconnect grace ------------------------------------------------------
 
   pauseForReconnect(seat) {
-    this.stopTick();
-    this.clearPhaseTimer();
-    this.phase = 'paused';
+    if (this.phase !== 'paused') {
+      this.stopTick();
+      this.clearPhaseTimer();
+      this.phase = 'paused';
+    }
     this.broadcast({ t: 'paused', seat, seconds: RECONNECT_GRACE_MS / 1000 });
-
-    this.graceTimer = setTimeout(() => {
-      this.graceTimer = null;
-      // Never came back: the round is forfeit to whoever is still at the table.
-      const other = seat === 'p1' ? 'p2' : 'p1';
-      if (this.seats[other] && this.seats[other].connected) {
-        this.wins[other]++;
-        this.broadcast({
-          t: 'roundover',
-          winner: other,
-          causes: { [seat]: 'forfeit' },
-          wins: this.wins,
-          scores: this.scores(),
-          forfeit: true
-        });
-      }
-      this.seats[seat] = null;
-      this.state = null;
-      this.phase = 'waiting';
-      this.broadcastPeers('leave', seat);
-      this.checkEmpty();
-    }, RECONNECT_GRACE_MS);
+    this.clearGrace(seat);
+    this.graceTimers[seat] = setTimeout(() => this.finishForfeit(seat), RECONNECT_GRACE_MS);
   }
 
-  clearGrace() {
-    if (this.graceTimer) {
-      clearTimeout(this.graceTimer);
-      this.graceTimer = null;
+  finishForfeit(seat) {
+    this.clearGrace(seat);
+    if (!this.seats[seat]) return;
+    const other = seat === 'p1' ? 'p2' : 'p1';
+    if (this.phase === 'paused' && this.seats[other] && this.seats[other].connected) {
+      this.wins[other]++;
+      this.broadcast({ t: 'roundover', winner: other, causes: { [seat]: 'forfeit' }, wins: this.wins, scores: this.scores(), forfeit: true });
+    }
+    this.seats[seat] = null;
+    this.state = null;
+    this.phase = 'waiting';
+    this.broadcastPeers('leave', seat);
+    this.checkEmpty();
+    this.maybeStart();
+  }
+
+  clearGrace(seat) {
+    for (const key of seat ? [seat] : duel.SEATS) {
+      if (this.graceTimers[key]) clearTimeout(this.graceTimers[key]);
+      this.graceTimers[key] = null;
     }
   }
 

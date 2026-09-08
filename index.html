@@ -76,6 +76,19 @@
           <div class="mode-selector-wrap">
             <button id="mode-solo-btn" class="mode-pill-btn active" data-mode="solo">🐍 Solo Mode</button>
             <button id="mode-vs-btn" class="mode-pill-btn" data-mode="vs">⚔️ Tron Duel (2P)</button>
+            <button id="mode-online-btn" class="mode-pill-btn" data-mode="online">🌐 Online Duel</button>
+          </div>
+
+          <div id="online-controls" class="online-controls hidden">
+            <div class="online-actions">
+              <button id="quick-match-btn" class="sketch-btn mini-btn">Quick Match</button>
+              <button id="create-room-btn" class="sketch-btn mini-btn">Create Room</button>
+            </div>
+            <div class="join-room-row">
+              <input id="room-code-input" maxlength="4" autocomplete="off" aria-label="Four-character room code" placeholder="ROOM CODE">
+              <button id="join-room-btn" class="sketch-btn mini-btn">Join</button>
+            </div>
+            <p id="online-status" role="status">Choose a match option.</p>
           </div>
 
           <p id="overlay-msg">Swipe or arrows to slither. <strong>[SPACE]</strong> or <strong>✏️ INK</strong> shoots lead! Beware rogue erasers 🧼 & grab highlighters for ghost immunity ✨</p>
@@ -159,6 +172,8 @@
     </aside>
   </div>
 
+  <script src="game-rules.js"></script>
+  <script src="net.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

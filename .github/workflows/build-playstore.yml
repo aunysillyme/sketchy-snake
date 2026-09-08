@@ -40,10 +40,7 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Sync Capacitor Android
-        run: |
-          mkdir -p www
-          cp index.html style.css game.js favicon.png apple-touch-icon.png www/
-          npx cap sync android
+        run: npm run sync:android
 
       - name: Build Android App Bundle (AAB)
         env:
