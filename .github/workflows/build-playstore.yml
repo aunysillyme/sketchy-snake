@@ -41,8 +41,9 @@ jobs:
 
       - name: Sync Capacitor Android
         run: |
-          mkdir -p android/app/src/main/assets/public
-          cp index.html style.css game.js favicon.png apple-touch-icon.png android/app/src/main/assets/public/
+          mkdir -p www
+          cp index.html style.css game.js favicon.png apple-touch-icon.png www/
+          npx cap sync android
 
       - name: Build Android App Bundle (AAB)
         run: |
