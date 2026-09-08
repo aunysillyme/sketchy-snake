@@ -7,7 +7,7 @@ const root = path.resolve(__dirname, '..');
 const output = path.join(root, 'www');
 const files = [
   'index.html', 'style.css', 'game.js', 'game-rules.js', 'net.js', 'manifest.json',
-  'favicon.svg', 'favicon.png', 'apple-touch-icon.png', 'og-thumbnail.jpg'
+  'favicon.svg', 'favicon.png', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'og-thumbnail.jpg'
 ];
 
 fs.mkdirSync(output, { recursive: true });

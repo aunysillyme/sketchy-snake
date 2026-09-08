@@ -1,15 +1,23 @@
 {
   "name": "sketchy-snake",
   "version": "1.0.0",
-  "description": "",
+  "description": "Hand-drawn arcade snake with solo, hot-seat, and online multiplayer modes.",
   "main": "game.js",
   "scripts": {
     "test": "node --test test/*.test.js && npm --prefix server test",
     "sync:android": "node scripts/sync-www.js && npx cap sync android"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "snake-game",
+    "html5-game",
+    "canvas",
+    "multiplayer",
+    "websocket",
+    "capacitor",
+    "android"
+  ],
+  "author": "Auny",
+  "license": "MIT",
   "dependencies": {
     "@capacitor/android": "^8.5.1",
     "@capacitor/cli": "^8.5.1",

@@ -72,6 +72,8 @@ test('static serving exposes only explicit public game assets', async () => {
   }
   assert.equal((await request('/game.js')).status, 200);
   assert.equal((await request('/game-rules.js')).status, 200);
+  assert.equal((await request('/icon-192.png')).status, 200);
+  assert.equal((await request('/icon-512.png')).status, 200);
   assert.equal((await request('/net.js')).status, 200);
   assert.equal((await request('/privacy.html')).status, 200);
 });

@@ -27,7 +27,8 @@ const PUBLIC_FILES = new Map([
   ['/', 'index.html'], ['/index.html', 'index.html'], ['/style.css', 'style.css'],
   ['/game.js', 'game.js'], ['/game-rules.js', 'game-rules.js'], ['/net.js', 'net.js'], ['/manifest.json', 'manifest.json'],
   ['/favicon.svg', 'favicon.svg'], ['/favicon.png', 'favicon.png'],
-  ['/apple-touch-icon.png', 'apple-touch-icon.png'], ['/og-thumbnail.jpg', 'og-thumbnail.jpg'],
+  ['/apple-touch-icon.png', 'apple-touch-icon.png'], ['/icon-192.png', 'icon-192.png'],
+  ['/icon-512.png', 'icon-512.png'], ['/og-thumbnail.jpg', 'og-thumbnail.jpg'],
   ['/privacy.html', 'privacy.html']
 ]);
 const HEARTBEAT_MS = 30000;
