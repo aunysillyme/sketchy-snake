@@ -18,7 +18,7 @@ android {
     }
     signingConfigs {
         release {
-            storeFile file('../sketchy-snake-release.keystore')
+            storeFile file('sketchy-snake-release.keystore')
             storePassword 'sketchysnake2026'
             keyAlias 'sketchysnake'
             keyPassword 'sketchysnake2026'
