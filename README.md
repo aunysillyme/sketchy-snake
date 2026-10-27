@@ -1,5 +1,7 @@
 # ✏️ Sketchy Snake 🐍
 
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/aunysillyme/sketchy-snake/badge)](https://scorecard.dev/viewer/?uri=github.com/aunysillyme/sketchy-snake)
+
 <p align="center">
   <img src="og-thumbnail.jpg" alt="Sketchy Snake Banner" width="100%" style="border-radius: 12px; border: 3px solid #2A2B32;" />
 </p>
