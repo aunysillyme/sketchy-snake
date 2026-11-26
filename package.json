@@ -20,7 +20,7 @@
   "license": "MIT",
   "dependencies": {
     "@capacitor/android": "^8.5.1",
-    "@capacitor/cli": "^8.5.1",
+    "@capacitor/cli": "^8.6.3",
     "@capacitor/core": "^8.5.1"
   }
 }
